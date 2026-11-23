@@ -13,8 +13,11 @@ Parameters:
     Description: Route 53 hosted zone id for the parent domain (mickschroeder.com)
   GitHubRepo:
     Type: String
-    Default: mick-schroeder/movies.mickschroeder.com
-    Description: owner/repo allowed to publish
+    Default: mick-schroeder@470293/movies.mickschroeder.com@1455226765
+    Description: >-
+      Repo allowed to publish, as it appears in GitHub's OIDC subject claim. This repo uses
+      immutable subjects (owner@id/repo@id). Check with:
+      gh api repos/OWNER/REPO/actions/oidc/customization/sub
   ExistingOidcProviderArn:
     Type: String
     Default: ''
