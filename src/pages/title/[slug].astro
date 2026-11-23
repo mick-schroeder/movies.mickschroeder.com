@@ -1,0 +1,136 @@
+---
+import BrandIcon from "@/components/brand-icon.astro"
+import MovieRidge from "@/components/movie-ridge.astro"
+import { buttonVariants } from "@/components/ui/button"
+import { SITE } from "@/consts"
+import Layout from "@/layouts/base.astro"
+import { movieLinks, moviePath } from "@/lib/links"
+import { getMovies, type MovieSummary } from "@/lib/movies"
+import { formatDate } from "@/lib/ridgeline"
+import { genreLabel } from "@/lib/utils"
+import {
+  type SimpleIcon,
+  siImdb,
+  siLetterboxd,
+  siMdblist,
+  siMetacritic,
+  siRottentomatoes,
+  siThemoviedatabase,
+  siTrakt,
+} from "simple-icons"
+
+export async function getStaticPaths() {
+  return (await getMovies()).map((movie) => ({
+    params: { slug: moviePath(movie).split("/")[2]! },
+    props: { movie },
+  }))
+}
+
+const { movie } = Astro.props as { movie: MovieSummary }
+const links = movieLinks(movie)
+
+// Each service's logo
+const ICONS: Record<string, SimpleIcon> = {
+  TMDB: siThemoviedatabase,
+  IMDb: siImdb,
+  Letterboxd: siLetterboxd,
+  MDBList: siMdblist,
+  "Rotten Tomatoes": siRottentomatoes,
+  Metacritic: siMetacritic,
+  Trakt: siTrakt,
+}
+const year = movie.release_date?.slice(0, 4)
+const released = movie.release_date && formatDate(movie.release_date)
+const genres = genreLabel(movie.genres, 3)
+
+const stats = [
+  {
+    label: "Tonight",
+    value: movie.tonight ? `#${movie.tonight}` : "Not ranked",
+    accent: !!movie.tonight,
+  },
+  { label: "Best rank", value: movie.best ? `#${movie.best}` : "–" },
+  { label: "Nights ranked", value: String(movie.nights) },
+  {
+    label: "First ranked",
+    value: movie.firstNight ? formatDate(movie.firstNight) : "–",
+  },
+]
+
+const jsonLd = [
+  {
+    "@type": "Movie",
+    name: movie.title,
+    ...(movie.release_date && { datePublished: movie.release_date }),
+    ...(movie.poster_url && { image: movie.poster_url }),
+    sameAs: links.map((link) => link.url),
+  },
+]
+---
+
+<Layout
+  title={`${movie.title}${year ? ` (${year})` : ""} · ${SITE.title}`}
+  description={`How ${movie.title} has ranked in ${SITE.title}, night by night.`}
+  jsonLd={jsonLd}
+>
+  <section class="overflow-hidden">
+    <div class="mx-auto flex max-w-3xl flex-col gap-6 px-4 pt-10 pb-8 sm:flex-row sm:items-end sm:pt-14">
+      {movie.poster_url && (
+        <img
+          src={movie.poster_url}
+          alt=""
+          width="500"
+          height="750"
+          class="w-32 shrink-0 rounded-sm sm:w-40"
+        />
+      )}
+      <div class="flex flex-col gap-3">
+        <h1 class="font-heading text-[clamp(2.5rem,8vw,4.5rem)] leading-[0.88] font-extrabold tracking-[-0.05em] text-balance">
+          {movie.title}
+        </h1>
+        <div class="text-muted-foreground">
+          {released && <p>Released {released}</p>}
+          {genres && <p>{genres}</p>}
+        </div>
+      </div>
+    </div>
+
+    {movie.years.map((history) => (
+      <MovieRidge id={movie.id} history={history} />
+    ))}
+  </section>
+
+  <div class="mx-auto flex w-full max-w-3xl flex-col gap-10 px-4 pt-10">
+    <dl class="grid grid-cols-2 gap-6 sm:grid-cols-4">
+      {stats.map(({ label, value, accent }) => (
+        <div class="flex flex-col gap-1">
+          <dt class="text-sm text-muted-foreground">{label}</dt>
+          <dd
+            class:list={[
+              "font-heading text-3xl font-bold tracking-tight",
+              accent && "text-primary",
+            ]}
+          >
+            {value}
+          </dd>
+        </div>
+      ))}
+    </dl>
+
+    <nav aria-labelledby="links-heading" class="flex flex-col gap-3">
+      <h2 id="links-heading" class="text-sm text-muted-foreground">
+        {movie.title} elsewhere
+      </h2>
+      <ul class="flex flex-wrap gap-2">
+        {links.map(({ name, url }) => (
+          <li>
+            <a href={url} class={buttonVariants({ variant: "outline" })}>
+              {ICONS[name] && <BrandIcon icon={ICONS[name]} />}
+              {name}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  </div>
+</Layout>

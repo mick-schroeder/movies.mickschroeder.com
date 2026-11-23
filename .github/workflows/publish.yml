@@ -4,8 +4,13 @@ name: publish
 # Runs nightly, or by hand from the Actions tab ("Run workflow").
 on:
   schedule:
-    - cron: '17 6 * * *'
+    - cron: "17 6 * * *"
   workflow_dispatch:
+    inputs:
+      new_history:
+        description: Start the rank history, backfilling every year back to 2019 (first run only)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -25,32 +30,40 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
-          cache: npm
+          node-version-file: .nvmrc
+          cache: pnpm
 
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
 
       # Fails without writing anything if any list doesn't pass its checks,
       # so the live site keeps yesterday's files.
-      - name: Build lists
-        run: npm run build
+      - name: Build data
+        run: pnpm build:data ${{ inputs.new_history && '--new-history' || '' }}
         env:
           TMDB_KEY: ${{ secrets.TMDB_KEY }}
           MDBLIST_KEY: ${{ secrets.MDBLIST_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          # Optional: unset uses the default in config.js
+          # Optional: unset uses the default in pipeline/config.ts
           ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
+
+      - name: Build site
+        run: pnpm build
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: us-east-1
 
-      # No --delete: dated files from earlier days stay in the bucket
+      # No --delete: earlier years' best-pictures-YYYY.json files stay in the bucket.
+      # Astro's hashed assets never change, so they cache for a year.
       - name: Upload to S3
-        run: aws s3 sync public/ "s3://${{ vars.AWS_BUCKET }}/" --cache-control "public, max-age=3600" --no-progress
+        run: |
+          aws s3 sync dist/_astro/ "s3://${{ vars.AWS_BUCKET }}/_astro/" --cache-control "public, max-age=31536000, immutable" --no-progress
+          aws s3 sync dist/ "s3://${{ vars.AWS_BUCKET }}/" --exclude "_astro/*" --cache-control "public, max-age=3600" --no-progress
 
       - name: Refresh CloudFront cache
         run: |
@@ -62,11 +75,11 @@ jobs:
 
       - name: Check the live site matches this build
         run: |
-          for file in movies.json "movies-$(date -u +%Y%m%d).json" all-movies.json; do
+          for file in best-pictures.json "best-pictures-$(date -u +%Y).json"; do
             curl -fsS --compressed "$SITE_URL/$file" -o live.json
-            if ! cmp -s live.json "public/$file"; then
+            if ! cmp -s live.json "dist/$file"; then
               echo "::error::$SITE_URL/$file does not match this build"
               exit 1
             fi
-            echo "$file OK ($(jq length live.json) movies)"
+            echo "$file OK"
           done

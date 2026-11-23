@@ -1,0 +1,21 @@
+---
+import { SITE } from "@/consts"
+
+interface Props {
+  /** Leave the title out, when the page shows it large itself. */
+  hideTitle?: boolean
+}
+const { hideTitle = false } = Astro.props
+---
+
+<header class="flex items-center justify-between gap-4 px-4 py-3 sm:px-6">
+  <a
+    href="/"
+    class:list={[
+      "font-heading text-lg font-bold tracking-tight",
+      hideTitle && "invisible",
+    ]}
+  >
+    {SITE.title}
+  </a>
+</header>

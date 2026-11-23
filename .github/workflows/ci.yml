@@ -8,13 +8,17 @@ permissions:
   contents: read
 
 jobs:
-  lint:
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
-          cache: npm
-      - run: npm ci
-      - run: npm run lint
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Format, lint, typecheck and tests (API tests skip without keys)
+      - run: pnpm check
+      # Uses the live best-pictures.json, since CI has no API keys
+      - run: pnpm build

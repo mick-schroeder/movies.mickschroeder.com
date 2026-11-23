@@ -2,7 +2,7 @@
 
 `template.yml` creates everything the site needs, once:
 
-- a private S3 bucket that holds the published files
+- an S3 bucket with static website hosting that holds the published files
 - a CloudFront distribution serving it over HTTPS at `movies.mickschroeder.com`
 - the TLS certificate and the Route 53 records (validated and created automatically)
 - an IAM role that GitHub Actions assumes with OIDC. It only trusts the `main`
@@ -66,7 +66,7 @@ In the GitHub repo under **Settings → Secrets and variables → Actions**:
 | Variable | `AWS_ROLE_ARN` | output `AwsRoleArn` |
 | Variable | `AWS_BUCKET` | output `AwsBucket` |
 | Variable | `CLOUDFRONT_DISTRIBUTION_ID` | output `CloudFrontDistributionId` |
-| Variable (optional) | `ANTHROPIC_MODEL` | defaults to `claude-sonnet-5-5` |
+| Variable (optional) | `ANTHROPIC_MODEL` | defaults to `claude-haiku-5-5` |
 
 Then run the **publish** workflow from the Actions tab and check
-`https://movies.mickschroeder.com/movies.json`.
+`https://movies.mickschroeder.com/best-pictures.json`.

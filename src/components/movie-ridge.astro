@@ -1,0 +1,103 @@
+---
+// One movie's ridge across a year, drawn like a row of the standings chart, at the
+// page's full width. Rendered at build time; no script.
+import * as d3 from "d3"
+import { DAY, ridgeline, wobble, yearSpan } from "@/lib/ridgeline"
+import type { RankHistory } from "@/lib/types"
+
+interface Props {
+  id: number
+  history: RankHistory
+}
+
+const { id, history } = Astro.props
+const { start, end } = yearSpan(history)
+
+const byDate: Record<string, number> = {}
+for (const day of history.days) {
+  const i = day.ids.indexOf(id)
+  if (i >= 0) byDate[day.date] = i + 1
+}
+const points = ridgeline(byDate, history.days, start, end)
+
+// A fixed drawing box stretched to the page width; the line keeps its thickness
+const W = 1000
+const H = 220
+const BASE = H - 4
+const x = d3.scaleUtc([start, end], [24, W - 24])
+const shake = wobble(String(id))
+const last = points[points.length - 1]![1]
+const shape: [number, number][] = [
+  [0, 0],
+  [12, 0],
+  ...points.map(([t, h]): [number, number] => [x(t), h]),
+  [W - 12, last],
+  [W, last],
+].map(([px, h]) => [px!, BASE - h! * (H - 16) + shake(px!)])
+
+const line = d3.line().curve(d3.curveBasis)(shape)!
+const area = d3
+  .area()
+  .y0(BASE + 4)
+  .curve(d3.curveBasis)(shape)!
+
+const months = d3
+  .utcMonths(new Date(start), new Date(end - 14 * DAY))
+  .map((date) => ({
+    left: (x(date) / W) * 100,
+    label: date.toLocaleDateString("en-US", {
+      month: "short",
+      timeZone: "UTC",
+    }),
+  }))
+const ranked = Object.keys(byDate).length
+---
+
+<figure class="movie-ridge">
+  <svg
+    viewBox={`0 0 ${W} ${H}`}
+    preserveAspectRatio="none"
+    role="img"
+    aria-label={`How high it ranked across ${history.year}: ${ranked} night${ranked === 1 ? "" : "s"} in the standings`}
+  >
+    <path class="fill" d={area} />
+    <path class="ink" d={line} />
+  </svg>
+  <div class="months" aria-hidden="true">
+    {months.map(({ left, label }) => (
+      <span style={`left:${left}%`}>{label}</span>
+    ))}
+  </div>
+  <figcaption class="mx-auto max-w-3xl px-4 text-sm font-medium">
+    {history.year}
+  </figcaption>
+</figure>
+
+<style>
+  .movie-ridge svg {
+    display: block;
+    width: 100%;
+    height: clamp(140px, 22vw, 260px);
+  }
+  .fill {
+    fill: var(--background);
+  }
+  .ink {
+    fill: none;
+    stroke: var(--foreground);
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+  }
+  .months {
+    position: relative;
+    height: 2rem;
+    font-size: 12px;
+    color: var(--muted-foreground);
+  }
+  .months span {
+    position: absolute;
+    top: 0.5rem;
+    padding-left: 6px;
+  }
+</style>

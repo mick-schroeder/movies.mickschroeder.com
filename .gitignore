@@ -1,7 +1,21 @@
-node_modules
-.env
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build output
+dist/
+.astro/
+
+# nightly data, written by `pnpm build:data`
+public/best-pictures.json
+public/best-pictures-*.json
+
+# environment variables
+.env*
+
+# logs
 *.log
-.idea
+
+# editors and OS
+.idea/
 .DS_Store
-.cache/
-public/

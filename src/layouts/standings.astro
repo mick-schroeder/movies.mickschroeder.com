@@ -1,0 +1,58 @@
+---
+// The home page (chart) and /tonight/ (posters): the same hero and the same
+// Standings island, kept across the navigation so its filters stay put.
+import type { Props as HeadProps } from "@/components/site/base-head.astro"
+import BrandIcon from "@/components/brand-icon.astro"
+import { Standings, type ViewName } from "@/components/standings"
+import { buttonVariants } from "@/components/ui/button"
+import { FIRST_YEAR, SITE } from "@/consts"
+import Layout from "@/layouts/base.astro"
+import { moviePath } from "@/lib/links"
+import { getMovies, getStandings } from "@/lib/movies"
+import { siGithub } from "simple-icons"
+
+type Props = HeadProps & { view: ViewName }
+const { view, ...head } = Astro.props
+
+const thisYear = new Date().getUTCFullYear()
+const years = Array.from(
+  { length: thisYear - FIRST_YEAR + 1 },
+  (_, i) => thisYear - i
+)
+const pages = new Map((await getMovies()).map((m) => [m.id, moviePath(m)]))
+const tonight = (await getStandings()).map((movie) => ({
+  id: movie.tmdb_id,
+  title: movie.title,
+  poster_url: movie.poster_url,
+  genres: movie.genres,
+  href: pages.get(movie.tmdb_id)!,
+}))
+---
+
+<Layout {...head} hideTitle>
+  <section class="relative overflow-hidden pb-6">
+    <div class="px-4 pt-8 sm:px-6 sm:pt-12">
+      <h1 class="font-heading text-[clamp(3.25rem,13vw,11rem)] leading-[0.82] font-extrabold tracking-[-0.055em]">
+        <span class="mb-[0.3em] block text-[clamp(1.5rem,4vw,3.25rem)] leading-none font-bold tracking-[-0.03em]">
+          Mick Schroeder’s
+        </span>{" "}
+        {SITE.title}
+      </h1>
+      <p class="mt-4 text-xl font-medium text-balance text-muted-foreground sm:text-2xl">
+        {SITE.description}
+      </p>
+    </div>
+    <Standings
+      client:load
+      transition:persist="standings"
+      years={years}
+      view={view}
+      tonight={tonight}
+    >
+      <a href={SITE.code} class={buttonVariants({ variant: "outline" })}>
+        <BrandIcon icon={siGithub} />
+        GitHub
+      </a>
+    </Standings>
+  </section>
+</Layout>

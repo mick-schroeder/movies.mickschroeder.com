@@ -1,0 +1,8 @@
+pnpm-lock.yaml
+dist/
+.astro/
+public/best-pictures.json
+public/best-pictures-*.json
+CHANGELOG.md
+infra/
+.claude/

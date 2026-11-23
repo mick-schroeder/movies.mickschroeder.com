@@ -1,0 +1,23 @@
+---
+// A service's logo from Simple Icons (CC0) in its brand color, or in the text
+// color when the brand color would disappear on black.
+import type { SimpleIcon } from "simple-icons"
+
+interface Props {
+  icon: SimpleIcon
+  class?: string
+}
+
+const { icon, class: className = "size-4" } = Astro.props
+const [r, g, b] = [0, 2, 4].map((i) => parseInt(icon.hex.slice(i, i + 2), 16))
+const dark = 0.299 * r! + 0.587 * g! + 0.114 * b! < 80
+---
+
+<svg
+  viewBox="0 0 24 24"
+  aria-hidden="true"
+  class:list={["shrink-0", className]}
+  fill={dark ? "currentColor" : `#${icon.hex}`}
+>
+  <path d={icon.path} />
+</svg>

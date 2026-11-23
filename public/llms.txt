@@ -1,0 +1,21 @@
+# Best Pictures
+
+> Movies from the past year, recommended and ranked nightly by our AI editor. Built from TMDB and MDBList data. Updated nightly; poll at most once a day.
+
+Each night AI scores every movie released in the last 365 days (0-100, how strongly it would recommend it). A movie's standing score is a running average of its nightly scores, and the top 25 are the standings.
+
+## Files
+
+- [best-pictures.json](https://movies.mickschroeder.com/best-pictures.json): tonight's standings, 25 movies best first. A JSON array of objects with exactly these fields (same format as the StevenLu popular-movies lists):
+  - `title` (string)
+  - `tmdb_id` (integer, The Movie Database id)
+  - `imdb_id` (string like `tt1234567`)
+  - `poster_url` (string URL to a TMDB poster image)
+  - `genres` (array of snake_case strings, e.g. `science_fiction`)
+- `https://movies.mickschroeder.com/best-pictures-YYYY.json`: every night's standings for a calendar year, e.g. [best-pictures-2026.json](https://movies.mickschroeder.com/best-pictures-2026.json); files exist from 2019. An object with `year`, `days` (array of `{ date: "YYYY-MM-DD", ids: [tmdb_id, ...] }`, best first, oldest day first) `movies` (map of tmdb_id to `{ title, imdb_id, poster_url, release_date, links? }`, where the optional `links` has full URLs for any of `rottentomatoes`, `metacritic`, `letterboxd`, `trakt`) and `scores` (map of tmdb_id to standing score, 0-100, after the latest night). Days with `"source": "stevenlu"` were backfilled from [Steven Lu's popular-movies](https://github.com/sjlu/popular-movies) nightly lists (15 recent movies, his order) from before this site ranked its own; other days are this site's AI standings.
+
+## Optional
+
+- `https://movies.mickschroeder.com/title/{tmdb_id}-{title}/` (e.g. `/title/1368337-the-odyssey/`): a page for every movie that has been in the standings, with its nightly ranks and links to TMDB, IMDb, Letterboxd, MDBList and others
+
+- [Source code](https://github.com/mick-schroeder/movies.mickschroeder.com): MIT licensed, started as a fork of [sjlu/popular-movies](https://github.com/sjlu/popular-movies)

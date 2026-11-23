@@ -1,3 +1,17 @@
+## 2026-11-23
+
+* The site is now built with Astro and shadcn/ui (Luma style, black and white with small emerald accents). Tonight's standings are rendered into the page instead of loaded by script, and the standings chart and copy button are small React islands.
+* One pnpm + TypeScript project: the nightly pipeline moved to `pipeline/` (`pnpm build:data`), lodash, moment and dotenv were replaced with built-ins, and tests run on `node:test`.
+* The TMDB and MDBList credits use their logos from Simple Icons, drawn into the page; the old hotlinked TMDB logo had stopped working.
+* File formats are unchanged. Tonight's list moved from `movies.json` to `best-pictures.json`.
+* The home chart opens on Current recs (tonight's 25 over the last 365 days) and can show any year back to 2019. Earlier nights are backfilled from Steven Lu's lists. Every movie that has been ranked has its own page with links to TMDB, IMDb, Letterboxd, MDBList, Rotten Tomatoes, Metacritic and Trakt.
+* Renamed to **Best Pictures**. Instead of the recent movies (which the StevenLu lists already cover), it now ranks the year's movies: everything released in the last 365 days, so a movie can stay in the standings all year.
+* Each night's ranking is saved to `best-pictures-YYYY.json`, one file per calendar year, and the site charts every movie's rank across the year with its release date.
+* The AI scores every movie 0-100 each night, and a movie's standing score is a running average of those scores (25% tonight, 75% last night's standing), so the standings move steadily instead of reshuffling. Standing scores are saved in `best-pictures-YYYY.json`.
+* Ranking uses Claude Haiku 5.5 (was Sonnet 5.5) and costs about $1-2 a year (roughly 15k input and 4-5k output tokens a night).
+* Movies count by their first release date, so re-releases of older movies (a late US release, an anniversary run) are left out.
+* The list keeps the same format. Removed: `all-movies.json`, the `-minNN` filtered lists and new dated `movies-YYYYMMDD.json` files (existing dated files stay online).
+
 ## 2026-11-22
 
 * Fork of sjlu/popular-movies, published at https://movies.mickschroeder.com. Same file names and JSON format.
@@ -8,7 +22,7 @@
 * New lists: `movies-rottentomatoes-audience-min50` to `min80` and `movies-mdblist-min50` to `min80`.
 * Fixed movies with no IMDb rating being dropped from `all-movies.json` and the Metacritic and Rotten Tomatoes lists.
 * `movies.json` and the dated file now come from a single ranking call, so they always match.
-* "Recent" matchrs Radarr's Released setting. Previously a movie slow to reach digital lost most of its time on the lists.
+* "Recent" matches Radarr's Released setting. Previously a movie slow to reach digital lost most of its time on the lists.
 * Re-releases of old movies (anniversary screenings and the like) are left out, since their home release is years old.
 * `movies.json` has 20 movies (was 15).
 * Every list now needs 250 or more TMDB votes (was 100).
