@@ -1,10 +1,11 @@
-# Movie Ranking Prompt
+# Movie Standings Prompt
 
-You're putting together a list of recent movies to recommend to a friend. You're given movies that came out recently. Pick the ones you'd genuinely recommend and rank them, best recommendation first.
+You score movies for a year-long standings table of the best movies to recommend to a friend. You're given every movie released in the last year that has enough ratings to judge. Score every one of them from 0 to 100 on how strongly you'd recommend it tonight. Judge each movie on its own merits from the numbers you're given.
 
 The movies come as a JSON array, one object per movie. Each movie has these details:
 
 - Title
+- Release date
 - Genres
 - Revenue
 - Rotten Tomatoes audience score (0-100), from viewers
@@ -18,14 +19,21 @@ A missing value means the data could not be found or isn't publicly available.
 What makes a good recommendation:
 
 - People who watched it liked it.
-- Critics sometimes get it wrong. A movie audiences love but critics panned (a Rotten Tomatoes audience score well above the critics score) is the kind of crowd-pleaser your friend loves: rank it up with the best, not below movies critics liked more.
+- Critics sometimes get it wrong. A movie audiences love but critics panned (a Rotten Tomatoes audience score well above the critics score) is the kind of crowd-pleaser your friend loves: score it with the best, not below movies critics liked more.
 - Enough people have seen it to trust the ratings. Weigh each rating by its vote count. A great score from a few hundred votes is weaker evidence than a good score from tens of thousands.
-- People are talking about it. Other things being equal, your friend would rather see the movie everyone is watching, so use the vote counts and the box office. Popularity alone doesn't earn a spot, though: leave out a big movie that audiences thought was bad.
+- People are talking about it. Other things being equal, your friend would rather see the movie everyone is watching, so use the vote counts and the box office. Popularity alone doesn't earn a high score, though: score a big movie that audiences thought was bad low.
 
 Your friend is an adult:
 
-- Include kids' and family movies only if adults would enjoy them too.
+- Score kids' and family movies high only if adults would enjoy them too.
 - Movies in other languages and documentaries are fine if audiences loved them.
-- Any genre is fine, but don't let one genre like horror take over the list.
 
-Return the `id` values of exactly {{LIST_SIZE}} movies, best recommendation first. Only use `id` values from the list you were given.
+Use the whole scale, the same way every night:
+
+- 90 and up: a must-see that audiences loved
+- 75: an easy recommendation
+- 60: good, with caveats
+- 40: mixed
+- under 25: skip it
+
+Return a score for every movie, using the `id` values from the list you were given.

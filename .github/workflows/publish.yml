@@ -6,6 +6,11 @@ on:
   schedule:
     - cron: '17 6 * * *'
   workflow_dispatch:
+    inputs:
+      new_history:
+        description: Start this year's rank history (first run only)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -35,7 +40,7 @@ jobs:
       # Fails without writing anything if any list doesn't pass its checks,
       # so the live site keeps yesterday's files.
       - name: Build lists
-        run: npm run build
+        run: npm run build -- ${{ inputs.new_history && '--new-history' || '' }}
         env:
           TMDB_KEY: ${{ secrets.TMDB_KEY }}
           MDBLIST_KEY: ${{ secrets.MDBLIST_KEY }}
@@ -48,7 +53,7 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: us-east-1
 
-      # No --delete: dated files from earlier days stay in the bucket
+      # No --delete: earlier years' ranks-YYYY.json files stay in the bucket
       - name: Upload to S3
         run: aws s3 sync public/ "s3://${{ vars.AWS_BUCKET }}/" --cache-control "public, max-age=3600" --no-progress
 
@@ -62,11 +67,11 @@ jobs:
 
       - name: Check the live site matches this build
         run: |
-          for file in movies.json "movies-$(date -u +%Y%m%d).json" all-movies.json; do
+          for file in movies.json "ranks-$(date -u +%Y).json"; do
             curl -fsS --compressed "$SITE_URL/$file" -o live.json
             if ! cmp -s live.json "public/$file"; then
               echo "::error::$SITE_URL/$file does not match this build"
               exit 1
             fi
-            echo "$file OK ($(jq length live.json) movies)"
+            echo "$file OK"
           done

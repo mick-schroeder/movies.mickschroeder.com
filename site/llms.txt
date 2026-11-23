@@ -1,29 +1,19 @@
-# AI Curated Recent Movies
+# Movie Standings
 
-> New movies you can watch at home, picked by AI every night. Built from TMDB and MDBList data. Same file names and JSON format as the StevenLu popular-movies lists. Updated nightly; poll at most once a day.
+> The year's best movies, ranked by AI every night, with every movie's rise and fall charted across the year. Built from TMDB and MDBList data. Updated nightly; poll at most once a day.
 
-Every file is a JSON array of objects with exactly these fields:
+Each night AI scores every movie released in the last 365 days (0-100, how strongly it would recommend it). A movie's standing score is a running average of its nightly scores, and the top 20 are the standings.
 
-- `title` (string)
-- `tmdb_id` (integer, The Movie Database id)
-- `imdb_id` (string like `tt1234567`, or null in the unranked lists)
-- `poster_url` (string URL to a TMDB poster image)
-- `genres` (array of snake_case strings, e.g. `science_fiction`)
+## Files
 
-## Lists
-
-- [movies.json](https://movies.mickschroeder.com/movies.json): 20 movies ranked by AI, best recommendation first
-- `https://movies.mickschroeder.com/movies-YYYYMMDD.json`: a dated copy of movies.json for each day since this site started, e.g. `movies-20261123.json`
-- [all-movies.json](https://movies.mickschroeder.com/all-movies.json): every movie the ranking chose from, unranked
-
-## Filtered lists
-
-- [movies-metacritic-min50.json](https://movies.mickschroeder.com/movies-metacritic-min50.json): Metacritic score of 50 or more (also `min60`, `min70`, `min80`)
-- [movies-imdb-min5.json](https://movies.mickschroeder.com/movies-imdb-min5.json): IMDb rating of 5 or more (also `min6`, `min7`, `min8`)
-- [movies-rottentomatoes-min50.json](https://movies.mickschroeder.com/movies-rottentomatoes-min50.json): Rotten Tomatoes score of 50 or more (also `min60`, `min70`, `min80`)
-- [movies-rottentomatoes-audience-min50.json](https://movies.mickschroeder.com/movies-rottentomatoes-audience-min50.json): Rotten Tomatoes audience score of 50 or more (also `min60`, `min70`, `min80`)
-- [movies-mdblist-min50.json](https://movies.mickschroeder.com/movies-mdblist-min50.json): MDBList score, a blend of all ratings, of 50 or more (also `min60`, `min70`, `min80`)
+- [movies.json](https://movies.mickschroeder.com/movies.json): tonight's standings, 20 movies best first. A JSON array of objects with exactly these fields (same format as the StevenLu popular-movies lists):
+  - `title` (string)
+  - `tmdb_id` (integer, The Movie Database id)
+  - `imdb_id` (string like `tt1234567`)
+  - `poster_url` (string URL to a TMDB poster image)
+  - `genres` (array of snake_case strings, e.g. `science_fiction`)
+- `https://movies.mickschroeder.com/ranks-YYYY.json`: every night's standings for a calendar year, e.g. [ranks-2026.json](https://movies.mickschroeder.com/ranks-2026.json). An object with `year`, `days` (array of `{ date: "YYYY-MM-DD", ids: [tmdb_id, ...] }`, best first, oldest day first) `movies` (map of tmdb_id to `{ title, imdb_id, poster_url, release_date }`) and `scores` (map of tmdb_id to standing score, 0-100, after the latest night).
 
 ## Optional
 
-- [Source code](https://github.com/mick-schroeder/movies.mickschroeder.com): MIT licensed, fork of [sjlu/popular-movies](https://github.com/sjlu/popular-movies)
+- [Source code](https://github.com/mick-schroeder/movies.mickschroeder.com): MIT licensed, started as a fork of [sjlu/popular-movies](https://github.com/sjlu/popular-movies)

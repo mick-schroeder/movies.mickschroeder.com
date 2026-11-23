@@ -1,3 +1,12 @@
+## 2026-11-23
+
+* Renamed to **Movie Standings**. Instead of the recent movies (which the StevenLu lists already cover), it now ranks the year's movies: everything released in the last 365 days, so a movie can stay in the standings all year.
+* Each night's ranking is saved to `ranks-YYYY.json`, one file per calendar year, and the site charts every movie's rank across the year with its release date.
+* The AI scores every movie 0-100 each night, and a movie's standing score is a running average of those scores (25% tonight, 75% last night's standing), so the standings move steadily instead of reshuffling. Standing scores are saved in `ranks-YYYY.json`.
+* Ranking uses Claude Haiku 5.5 (was Sonnet 5.5) and costs about $1-2 a year (roughly 15k input and 4-5k output tokens a night).
+* Movies count by their first release date, so re-releases of older movies (a late US release, an anniversary run) are left out.
+* `movies.json` keeps the same format. Removed: `all-movies.json`, the `-minNN` filtered lists and new dated `movies-YYYYMMDD.json` files (existing dated files stay online).
+
 ## 2026-11-22
 
 * Fork of sjlu/popular-movies, published at https://movies.mickschroeder.com. Same file names and JSON format.
@@ -8,7 +17,7 @@
 * New lists: `movies-rottentomatoes-audience-min50` to `min80` and `movies-mdblist-min50` to `min80`.
 * Fixed movies with no IMDb rating being dropped from `all-movies.json` and the Metacritic and Rotten Tomatoes lists.
 * `movies.json` and the dated file now come from a single ranking call, so they always match.
-* "Recent" is now measured from when a movie is out at home (first US digital or disc release, matching Radarr's Released setting), not from its theatrical release: movies are listed from 14 days before that until 180 days after. Previously a movie slow to reach digital lost most of its time on the lists.
+* "Recent" is now measured from when a movie is out at home (first US digital or disc release), not from its theatrical release: movies are listed from 14 days before that until 180 days after. Previously a movie slow to reach digital lost most of its time on the lists.
 * Re-releases of old movies (anniversary screenings and the like) are left out, since their home release is years old.
 * `movies.json` has 20 movies (was 15) and always exactly that many (a run with fewer fails and leaves yesterday's files live), and the AI only picks movies with 500 or more TMDB votes, so picks wait until ratings have settled.
 * Every list now needs 250 or more TMDB votes (was 100), keeping the lists closer to their original size. The TMDB average minimum is now 3 (was 4).

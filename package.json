@@ -1,7 +1,7 @@
 {
-  "name": "popular-movies",
+  "name": "movie-standings",
   "version": "0.1.0",
-  "description": "New movies you can watch at home, picked by AI every night. Same file names and JSON format as the StevenLu popular-movies lists.",
+  "description": "The year's best movies, ranked by AI every night, with every movie's rise and fall charted across the year.",
   "main": "index.js",
   "scripts": {
     "build": "./bin/build.js",
@@ -17,7 +17,6 @@
   },
   "keywords": [
     "movies",
-    "radarr",
     "popular-movies"
   ],
   "author": "Mick Schroeder, LLC",
@@ -37,7 +36,6 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.12.0",
-    "bluebird": "^3.7.2",
     "dotenv": "^16.0.3",
     "lodash": "^4.17.21",
     "moment": "^2.29.4"

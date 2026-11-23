@@ -9,7 +9,9 @@ const env = {
   TMDB_KEY: '',
   MDBLIST_KEY: '',
   ANTHROPIC_API_KEY: '',
-  ANTHROPIC_MODEL: 'claude-sonnet-5-5'
+  ANTHROPIC_MODEL: 'claude-haiku-5-5',
+  // Where the build downloads earlier rank history (ranks-YYYY.json) from
+  SITE_URL: 'https://movies.mickschroeder.com'
 }
 
 // Empty env vars (e.g. an unset GitHub Actions variable) fall back to the defaults
@@ -22,21 +24,18 @@ module.exports = {
   TMDB_POSTER_URL: 'https://image.tmdb.org/t/p/w500',
   ANTHROPIC_EFFORT: 'medium',
 
-  // Which movies count as recent, measured from the day a movie is out at home
-  // (its first US digital or disc release; see getAvailableDate in index.js).
-  // Same as Radarr's Availability Delay (Settings → Indexers): days before (negative)
-  // or after (positive) the available date. -14 lists a movie 14 days before it's out
-  AVAILABILITY_DELAY: -14,
-  // Keep it eligible for this many days after it's out
-  DAYS_AFTER_AVAILABLE: 180,
+  // Rolling window: movies released (TMDB release date) in the last this many days
+  DAYS_BACK: 365,
 
-  // Every list: only movies with at least this many TMDB votes
+  // TMDB search: only movies with at least this many votes and this average (0-10)
   MIN_VOTES_ALL_LISTS: 250,
-  // Every list: only movies with a TMDB average of at least this (0-10)
   MIN_TMDB_RATING: 3,
-  // movies.json: the AI only picks from movies with at least this many TMDB votes,
-  // so picks are made once ratings have settled
+  // The AI only picks from movies with at least this many TMDB votes,
+  // so a movie joins the standings once it has traction
   MIN_VOTES: 500,
   // movies.json: exactly this many movies
-  LIST_SIZE: 20
+  LIST_SIZE: 20,
+  // How much tonight's AI score counts toward a movie's standing score (the rest is
+  // last night's standing). Lower is steadier; higher reacts faster.
+  SMOOTHING: 0.25
 }

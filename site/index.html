@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="New movies you can watch at home, picked by AI every night.">
+  <meta name="description" content="The year's best movies, ranked by AI every night, with every movie's rise and fall charted across the year.">
   <meta name="color-scheme" content="light dark">
-  <title>AI Curated Recent Movies</title>
+  <title>Movie Standings</title>
   <style>
     :root {
       --bg: #fafaf9;
@@ -13,6 +13,7 @@
       --muted: #78716c;
       --card: #e7e5e4;
       --accent: #b45309;
+      --grid: #e7e5e4;
     }
     @media (prefers-color-scheme: dark) {
       :root {
@@ -21,6 +22,7 @@
         --muted: #a8a29e;
         --card: #292524;
         --accent: #f59e0b;
+        --grid: #292524;
       }
     }
 
@@ -63,9 +65,8 @@
     }
     nav a:hover { border-color: var(--accent); }
 
-    .radarr { max-width: 560px; margin-bottom: 24px; }
-    .radarr label { display: block; font-weight: 600; margin-bottom: 6px; }
-    .radarr p { margin: 8px 0 0; color: var(--muted); font-size: 0.875rem; }
+    .list-url { max-width: 560px; margin-bottom: 40px; }
+    .list-url label { display: block; font-weight: 600; margin-bottom: 6px; }
 
     .copy { display: flex; gap: 8px; }
 
@@ -96,7 +97,8 @@
       margin: 40px 0;
       padding: 0;
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      /* At most 5 columns, so the 20-movie list fills even rows */
+      grid-template-columns: repeat(auto-fill, minmax(max(160px, (100% - 4 * 16px) / 5), 1fr));
       gap: 24px 16px;
       counter-reset: rank;
     }
@@ -125,13 +127,14 @@
       position: absolute;
       top: 8px;
       left: 8px;
-      min-width: 28px;
-      padding: 2px 8px;
-      border-radius: 999px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
       background: rgb(0 0 0 / 0.7);
       color: #fff;
       font-size: 0.8125rem;
       font-weight: 600;
+      line-height: 28px;
       text-align: center;
     }
 
@@ -154,37 +157,88 @@
       font-size: 0.8125rem;
     }
 
+    .standings { position: relative; margin: 48px 0; }
+    .standings-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .standings h2 { margin: 0; font-size: 1.375rem; letter-spacing: -0.01em; }
+    .standings select {
+      padding: 6px 10px;
+      border: 1px solid var(--card);
+      border-radius: 8px;
+      background: var(--card);
+      color: var(--fg);
+      font: inherit;
+    }
+    .note { margin: 6px 0 16px; color: var(--muted); font-size: 0.875rem; }
+    /* The chart keeps a readable size and scrolls sideways on phones */
+    .chart-scroll { position: relative; overflow-x: auto; }
+    #chart { min-width: 680px; }
+    #chart svg { display: block; }
+    .ridge path { fill: var(--bg); stroke: var(--fg); stroke-width: 1.25; stroke-linejoin: round; }
+    .ridge text { fill: var(--muted); font-size: 11px; }
+    .ridge .release { fill: var(--fg); }
+    .ridge.on path { stroke: var(--accent); stroke-width: 2.5; }
+    .ridge.on text { fill: var(--fg); font-weight: 600; }
+    .ridge.on .release { fill: var(--accent); }
+    .month { fill: var(--muted); font-size: 11px; }
+    .tooltip {
+      position: absolute;
+      pointer-events: none;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: var(--fg);
+      color: var(--bg);
+      font-size: 0.8125rem;
+      line-height: 1.4;
+      white-space: nowrap;
+    }
+    .empty { color: var(--muted); padding: 48px 0; text-align: center; }
+
     footer {
       color: var(--muted);
       font-size: 0.8125rem;
     }
     footer a { color: inherit; }
+    .tmdb { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
+    .tmdb img { display: block; }
   </style>
 </head>
 <body>
   <main>
-    <h1>AI Curated Recent Movies</h1>
-    <p class="tagline">Recently released movies, selected and ranked by our AI editor, refreshed every night.</p>
+    <h1>Movie Standings</h1>
+    <p class="tagline">The year's best movies, ranked by AI every night, with every movie's rise and fall charted across the year.</p>
 
-    <section class="radarr">
-      <label for="list-url">Add to Radarr</label>
+    <nav>
+      <a href="https://github.com/mick-schroeder/movies.mickschroeder.com">GitHub</a>
+      <a href="https://www.mickschroeder.com/">mickschroeder.com</a>
+    </nav>
+
+    <ol id="movies" aria-label="Tonight's standings, best first"></ol>
+
+    <section class="standings" aria-labelledby="standings-heading">
+      <div class="standings-head">
+        <h2 id="standings-heading">Standings over the year</h2>
+        <select id="year" aria-label="Year"></select>
+      </div>
+      <p class="note">One ridge per movie, in the order they joined the standings. The higher the ridge, the higher it ranked that week. A dot marks its release. Hover a ridge or poster to follow one movie.</p>
+      <div class="chart-scroll" id="chart-scroll"><div id="chart"></div><div class="tooltip" id="tooltip" hidden></div></div>
+      <p class="empty" id="chart-empty" hidden>No standings for this year yet.</p>
+    </section>
+
+    <section class="list-url">
+      <label for="list-url">Tonight's standings as a JSON list</label>
       <div class="copy">
         <input id="list-url" type="text" readonly value="https://movies.mickschroeder.com/movies.json" onclick="this.select()">
         <button type="button" id="copy-button">Copy</button>
       </div>
-      <p>In Radarr, go to <b>Settings → Import Lists</b>, click <b>+</b>, choose <b>StevenLu Custom</b>, paste this URL and save.</p>
     </section>
-
-    <nav>
-      <a href="https://github.com/mick-schroeder/movies.mickschroeder.com">GitHub</a>
-    </nav>
-
-    <ol id="movies" aria-label="Today's picks, best first"></ol>
 
     <footer>
       Fork of <a href="https://github.com/sjlu/popular-movies">sjlu/popular-movies</a> by Steven Lu.
-      This product uses the TMDB API but is not endorsed or certified by TMDB.
-      <br>
+      Ratings data from <a href="https://mdblist.com/">MDBList</a>.
+      <p class="tmdb">
+        <a href="https://www.themoviedb.org/"><img src="https://www.themoviedb.org/assets/2/v4/logos/v2/blue_short-8e7b30f73a4020692ccca9c88bafe5dcb6f8a62a4c6bc55cd9ba82bb2cd95f6c.svg" alt="TMDB" width="120" height="16"></a>
+        This product uses the TMDB API but is not endorsed or certified by TMDB.
+      </p>
       © 2026 Mick Schroeder, LLC. · <a href="https://www.mickschroeder.com/privacy-policy/">Privacy Policy</a>
     </footer>
   </main>
@@ -199,6 +253,7 @@
     </li>
   </template>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
   <script>
     const list = document.getElementById('movies')
     const template = document.getElementById('movie')
@@ -220,6 +275,9 @@
       .then(movies => {
         for (const movie of movies) {
           const item = template.content.cloneNode(true)
+          const li = item.querySelector('li')
+          li.addEventListener('pointerenter', () => highlight(movie.tmdb_id))
+          li.addEventListener('pointerleave', () => highlight(null))
           item.querySelector('a').href = `https://www.imdb.com/title/${movie.imdb_id}/`
           item.querySelector('.title').textContent = movie.title
           item.querySelector('.genres').textContent = movie.genres.slice(0, 2).map(label).join(' · ')
@@ -232,8 +290,175 @@
         }
       })
       .catch(() => {
-        list.outerHTML = '<p class="tagline">Couldn’t load today’s list. Try again later.</p>'
+        list.outerHTML = '<p class="tagline">Couldn’t load tonight’s standings. Try again later.</p>'
       })
+
+    // Standings chart: a ridgeline, one ridge per movie (ranks-YYYY.json).
+    // A ridge's height each night is how high the movie ranked (#1 tallest, off the list flat;
+    // squared so the top spots stand out), smoothed over two weeks so nightly wobbles don't show.
+    // Later rows are drawn on top. The year so far fills the width.
+    const FIRST_YEAR = 2026
+    const MAX_RANK = 20
+    const ROW = 14 // px between baselines
+    const PEAK = 8 // a #1 ridge rises this many rows
+    const SMOOTH_DAYS = 15
+    const M = { top: ROW * PEAK + 8, right: 190, bottom: 28, left: 16 }
+    const chartEl = document.getElementById('chart')
+    const scroller = document.getElementById('chart-scroll')
+    const tooltip = document.getElementById('tooltip')
+    const emptyNote = document.getElementById('chart-empty')
+    const yearSelect = document.getElementById('year')
+    let shown = null
+
+    const DAY = 86400000
+    const utc = date => Date.parse(date + 'T00:00:00Z')
+    const isoDate = t => new Date(t).toISOString().slice(0, 10)
+    const formatDate = date => new Date(utc(date)).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+    const escape = text => text.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
+
+    // The highlighted ridge comes to the front so its whole shape shows
+    function highlight (id) {
+      const ridges = d3.selectAll('#chart .ridge').classed('on', d => d.id === String(id))
+      if (id === null) ridges.sort((a, b) => a.row - b.row)
+      else ridges.filter('.on').raise()
+    }
+
+    // One movie's ridge: [time, height 0-1] for every day of the year, smoothed
+    function ridgeline (byDate, nights, start, end) {
+      // Nights the build didn't run take the night before
+      const heights = []
+      let night = 0
+      let current = 0
+      for (let t = start; t < end; t += DAY) {
+        while (night < nights.length && utc(nights[night].date) <= t) {
+          const rank = byDate[nights[night].date]
+          current = rank ? ((MAX_RANK + 1 - rank) / MAX_RANK) ** 2 : 0
+          night++
+        }
+        heights.push(current)
+      }
+
+      const half = Math.floor(SMOOTH_DAYS / 2)
+      return heights.map((_, i) => {
+        const window = heights.slice(Math.max(0, i - half), i + half + 1)
+        return [start + i * DAY, window.reduce((a, b) => a + b, 0) / window.length]
+      })
+    }
+
+    function drawChart (data) {
+      const year = data.year
+      const nights = data.days
+      const start = Date.UTC(year, 0, 1)
+      // A finished year runs to Dec 31; the current one ends at the latest night
+      const end = Math.min(Date.UTC(year + 1, 0, 1), utc(nights[nights.length - 1].date) + DAY)
+
+      // Rows in the order movies joined the standings
+      const movies = []
+      const ranks = {}
+      for (const night of nights) {
+        night.ids.forEach((id, i) => {
+          if (!ranks[id]) {
+            ranks[id] = {}
+            movies.push({ id: String(id), ...data.movies[id], row: movies.length })
+          }
+          ranks[id][night.date] = i + 1
+        })
+      }
+      for (const movie of movies) {
+        const nightRanks = Object.values(ranks[movie.id])
+        movie.best = Math.min(...nightRanks)
+        movie.nights = nightRanks.length
+        movie.points = ridgeline(ranks[movie.id], nights, start, end)
+      }
+
+      const width = Math.max(chartEl.clientWidth, 680)
+      const height = M.top + (movies.length - 1) * ROW + M.bottom
+      const x = d3.scaleUtc([start, end], [M.left, width - M.right])
+      const area = d3.area().x(p => x(p[0])).y0(0).y1(p => -p[1] * ROW * PEAK).curve(d3.curveBasis)
+      const line = d3.line().x(p => x(p[0])).y(p => -p[1] * ROW * PEAK).curve(d3.curveBasis)
+
+      const svg = d3.create('svg')
+        .attr('width', width)
+        .attr('height', height)
+        .attr('viewBox', [0, 0, width, height])
+        .attr('role', 'img')
+        .attr('aria-label', `How high each movie ranked across ${year}`)
+
+      svg.append('g')
+        .selectAll('text')
+        .data(d3.utcMonths(new Date(start), new Date(end - 14 * DAY)))
+        .join('text')
+        .attr('class', 'month')
+        .attr('x', d => x(d))
+        .attr('y', height - 8)
+        .text(d => d.toLocaleDateString(undefined, { month: 'short', timeZone: 'UTC' }))
+
+      const ridge = svg.append('g')
+        .selectAll('g')
+        .data(movies)
+        .join('g')
+        .attr('class', 'ridge')
+        .attr('transform', (d, i) => `translate(0,${M.top + i * ROW})`)
+
+      // The filled area hides the rows behind it; the stroke is the ridge line
+      ridge.append('path').attr('d', d => area(d.points)).attr('stroke', 'none')
+      ridge.append('path').attr('d', d => line(d.points)).style('fill', 'none')
+      ridge.filter(d => d.release_date && d.release_date.startsWith(year + '-'))
+        .append('circle')
+        .attr('class', 'release')
+        .attr('cx', d => x(utc(d.release_date)))
+        .attr('r', 2.5)
+      ridge.append('text')
+        .attr('x', width - M.right + 10)
+        .attr('y', 4)
+        .text(d => d.title.length > 28 ? d.title.slice(0, 27) + '…' : d.title)
+
+      ridge
+        .on('pointerenter', (event, d) => highlight(d.id))
+        .on('pointerleave', () => { highlight(null); tooltip.hidden = true })
+        .on('pointermove', (event, d) => {
+          const released = d.release_date ? `<br>Released ${formatDate(d.release_date)}` : ''
+          tooltip.innerHTML = `<b>${escape(d.title)}</b><br>Best #${d.best} · ${d.nights} night${d.nights === 1 ? '' : 's'} ranked${released}`
+          tooltip.hidden = false
+          const [px, py] = d3.pointer(event, scroller)
+          tooltip.style.left = Math.min(px + 14, scroller.scrollWidth - tooltip.offsetWidth - 4) + 'px'
+          // Above the pointer when there's no room below
+          tooltip.style.top = (py + 14 + tooltip.offsetHeight > scroller.clientHeight ? py - tooltip.offsetHeight - 10 : py + 14) + 'px'
+        })
+
+      chartEl.replaceChildren(svg.node())
+    }
+
+    function loadYear (year) {
+      tooltip.hidden = true
+      fetch(`ranks-${year}.json`)
+        .then(resp => resp.ok ? resp.json() : Promise.reject(new Error(resp.status)))
+        .then(data => {
+          if (!data.days.length) throw new Error('empty')
+          shown = data
+          scroller.hidden = false
+          emptyNote.hidden = true
+          drawChart(data)
+          // On phones the chart scrolls sideways: start at the latest nights
+          scroller.scrollLeft = scroller.scrollWidth
+        })
+        .catch(() => {
+          shown = null
+          scroller.hidden = true
+          emptyNote.hidden = false
+        })
+    }
+
+    const thisYear = new Date().getUTCFullYear()
+    for (let year = thisYear; year >= FIRST_YEAR; year--) yearSelect.append(new Option(year, year))
+    yearSelect.addEventListener('change', () => loadYear(Number(yearSelect.value)))
+    // The chart is drawn at the page's width, so redraw when that changes
+    let resizeTimer
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer)
+      resizeTimer = setTimeout(() => shown && drawChart(shown), 150)
+    })
+    loadYear(thisYear)
   </script>
 </body>
 </html>
