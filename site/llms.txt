@@ -1,0 +1,29 @@
+# AI Curated Recent Movies
+
+> New movies you can watch at home, picked by AI every night. Built from TMDB and MDBList data. Same file names and JSON format as the StevenLu popular-movies lists. Updated nightly; poll at most once a day.
+
+Every file is a JSON array of objects with exactly these fields:
+
+- `title` (string)
+- `tmdb_id` (integer, The Movie Database id)
+- `imdb_id` (string like `tt1234567`, or null in the unranked lists)
+- `poster_url` (string URL to a TMDB poster image)
+- `genres` (array of snake_case strings, e.g. `science_fiction`)
+
+## Lists
+
+- [movies.json](https://movies.mickschroeder.com/movies.json): 20 movies ranked by AI, best recommendation first
+- `https://movies.mickschroeder.com/movies-YYYYMMDD.json`: a dated copy of movies.json for each day since this site started, e.g. `movies-20261123.json`
+- [all-movies.json](https://movies.mickschroeder.com/all-movies.json): every movie the ranking chose from, unranked
+
+## Filtered lists
+
+- [movies-metacritic-min50.json](https://movies.mickschroeder.com/movies-metacritic-min50.json): Metacritic score of 50 or more (also `min60`, `min70`, `min80`)
+- [movies-imdb-min5.json](https://movies.mickschroeder.com/movies-imdb-min5.json): IMDb rating of 5 or more (also `min6`, `min7`, `min8`)
+- [movies-rottentomatoes-min50.json](https://movies.mickschroeder.com/movies-rottentomatoes-min50.json): Rotten Tomatoes score of 50 or more (also `min60`, `min70`, `min80`)
+- [movies-rottentomatoes-audience-min50.json](https://movies.mickschroeder.com/movies-rottentomatoes-audience-min50.json): Rotten Tomatoes audience score of 50 or more (also `min60`, `min70`, `min80`)
+- [movies-mdblist-min50.json](https://movies.mickschroeder.com/movies-mdblist-min50.json): MDBList score, a blend of all ratings, of 50 or more (also `min60`, `min70`, `min80`)
+
+## Optional
+
+- [Source code](https://github.com/mick-schroeder/movies.mickschroeder.com): MIT licensed, fork of [sjlu/popular-movies](https://github.com/sjlu/popular-movies)

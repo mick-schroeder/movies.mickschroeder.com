@@ -1,28 +1,20 @@
 /* eslint-env mocha */
 const expect = require('must')
 const Index = require('../index')
-const metacritic = require('../lib/metacritic')
-const omdb = require('../lib/omdb')
+const mdblist = require('../lib/mdblist')
 const tmdb = require('../lib/tmdb')
 
 describe('all', function () {
-  it('should get a list of movies from metacritic', async function () {
-    this.timeout(60000)
-    const movies = await metacritic()
-    expect(movies.length).gt(0)
-    expect(movies[0].title).to.be.string()
-    expect(movies[0].score).to.be.number()
-  })
-
   const IMDB_ID = 'tt11564570'
   const TMDB_ID = 661374
   const MOVIE_TITLE = 'Glass Onion: A Knives Out Mystery'
 
-  it('should get an omdb response', async function () {
-    const results = await omdb(IMDB_ID)
+  it('should get mdblist ratings', async function () {
+    const results = (await mdblist([TMDB_ID]))[TMDB_ID]
     expect(results.imdb_rating).gt(1)
     expect(results.imdb_votes).gt(1000)
     expect(results.rt_score).gt(1)
+    expect(results.metacritic_score).gt(1)
   })
 
   it('should get tmdb movie', async function () {
@@ -51,8 +43,9 @@ describe('all', function () {
       'genres'
     ])
     expect(movies[0].title).to.be.string()
-    expect(movies[0].imdb_id).to.be.string()
-    expect(movies[0].poster_url).to.be.string()
+    // Both can be null in the unfiltered list
+    expect(movies[0].imdb_id === null || typeof movies[0].imdb_id === 'string').to.be.true()
+    expect(movies[0].poster_url === null || typeof movies[0].poster_url === 'string').to.be.true()
     expect(movies[0].genres).to.be.array()
   })
 })

@@ -1,78 +1,115 @@
-# popular-movies
+# AI Curated Recent Movies
 
-Popular Movies uses LLMs to evaluate the popularity of movies that are released
-and are less than 4 months old. Popular Movies considers a multitude of data points
-such as ratings, popularity, production companies, actors, and more.
+Recently released movies, selected and ranked by our AI editor, refreshed every night.
+
+Each night, AI picks the 20 movies it would recommend to a friend from the ones
+that came out in the last 6 months. Audience ratings count for more than critics.
+
+This is a fork of [sjlu/popular-movies](https://github.com/sjlu/popular-movies)
+by Steven Lu. The files use **the same names and the same JSON format**, so anything
+that read the StevenLu lists can point at these instead.
 
 ## Usage
 
-> :warning: **The URL has changed from `https://s3.amazonaws.com/popular-movies/` to `https://popular-movies-data.stevenlu.com/` as of September 11, 2023.**
-> Access via S3 using TLS 1.0 or 1.1 will be [deprecated by AWS](https://aws.amazon.com/blogs/security/tls-1-2-required-for-aws-endpoints/) on December 31, 2023.
-> Access via S3 will be completely deprecated January 1, 2025.
-
-You can poll the following JSON file for a list of movies.
-
 ```
-https://popular-movies-data.stevenlu.com/movies.json
+https://movies.mickschroeder.com/movies.json
 ```
 
-  * This file is regenerated nightly so it is recommended that you
-    only poll this file once per day
-  * It is recommended that you take a snapshot of this list and not
-    remove based on the list no longer displaying a particular movie
-  * Subject to fair use; excessive usage will be rate limited
+- Updated nightly. Poll at most once a day.
 
-If you're looking for historical files, you can amend a date to the
-main file like so:
+### Radarr
 
-```
-https://popular-movies-data.stevenlu.com/movies-20191202.json
-```
+Add an import list of type **StevenLu Custom** and set the URL to
+`https://movies.mickschroeder.com/movies.json` (or any file below).
 
-_This file is only available from December 2, 2019 onwards._
+## Files
 
-## All Movies
+Every file is a JSON array of:
 
-There is also a file that includes all movies. This file is not filtered or evaluated.
-
-```
-https://popular-movies-data.stevenlu.com/all-movies.json
+```json
+{
+  "title": "The Quiet Man",
+  "tmdb_id": 3109,
+  "imdb_id": "tt0045061",
+  "poster_url": "https://image.tmdb.org/t/p/w500/u3B1hVKHE56yBRoxF3Nk9uxHdYN.jpg",
+  "genres": ["romance", "comedy", "drama"]
+}
 ```
 
-There are also several variations of this file that are filtered by different
-rating websites.
-
-| File | Description |
+| File | Contents |
 | -- | -- |
-| [movies-metacritic-min50.json](https://popular-movies-data.stevenlu.com/movies-metacritic-min50.json) | Movies with a minimum score of 50 on Metacritic |
-| [movies-metacritic-min60.json](https://popular-movies-data.stevenlu.com/movies-metacritic-min60.json) | Movies with a minimum score of 60 on Metacritic |
-| [movies-metacritic-min70.json](https://popular-movies-data.stevenlu.com/movies-metacritic-min70.json) | Movies with a minimum score of 70 on Metacritic |
-| [movies-metacritic-min80.json](https://popular-movies-data.stevenlu.com/movies-metacritic-min80.json) | Movies with a minimum score of 80 on Metacritic |
-| [movies-imdb-min5.json](https://popular-movies-data.stevenlu.com/movies-imdb-min5.json) | Movies with a minimum score of 5 on IMDB |
-| [movies-imdb-min6.json](https://popular-movies-data.stevenlu.com/movies-imdb-min6.json) | Movies with a minimum score of 6 on IMDB |
-| [movies-imdb-min7.json](https://popular-movies-data.stevenlu.com/movies-imdb-min7.json) | Movies with a minimum score of 7 on IMDB |
-| [movies-imdb-min8.json](https://popular-movies-data.stevenlu.com/movies-imdb-min8.json) | Movies with a minimum score of 8 on IMDB |
-| [movies-rottentomatoes-min50.json](https://popular-movies-data.stevenlu.com/movies-rottentomatoes-min50.json) | Movies with a minimum score of 50 on Rotten Tomatoes |
-| [movies-rottentomatoes-min60.json](https://popular-movies-data.stevenlu.com/movies-rottentomatoes-min60.json) | Movies with a minimum score of 60 on Rotten Tomatoes |
-| [movies-rottentomatoes-min70.json](https://popular-movies-data.stevenlu.com/movies-rottentomatoes-min70.json) | Movies with a minimum score of 70 on Rotten Tomatoes |
-| [movies-rottentomatoes-min80.json](https://popular-movies-data.stevenlu.com/movies-rottentomatoes-min80.json) | Movies with a minimum score of 80 on Rotten Tomatoes |
+| [movies.json](https://movies.mickschroeder.com/movies.json) | 20 movies ranked by AI, best recommendation first |
+| `movies-YYYYMMDD.json` | A dated copy of `movies.json` for each day since this site started |
+| [all-movies.json](https://movies.mickschroeder.com/all-movies.json) | Every movie the ranking chose from, unranked |
+| [movies-metacritic-min50.json](https://movies.mickschroeder.com/movies-metacritic-min50.json) | Metacritic score of 50 or more |
+| [movies-metacritic-min60.json](https://movies.mickschroeder.com/movies-metacritic-min60.json) | Metacritic score of 60 or more |
+| [movies-metacritic-min70.json](https://movies.mickschroeder.com/movies-metacritic-min70.json) | Metacritic score of 70 or more |
+| [movies-metacritic-min80.json](https://movies.mickschroeder.com/movies-metacritic-min80.json) | Metacritic score of 80 or more |
+| [movies-imdb-min5.json](https://movies.mickschroeder.com/movies-imdb-min5.json) | IMDb rating of 5 or more |
+| [movies-imdb-min6.json](https://movies.mickschroeder.com/movies-imdb-min6.json) | IMDb rating of 6 or more |
+| [movies-imdb-min7.json](https://movies.mickschroeder.com/movies-imdb-min7.json) | IMDb rating of 7 or more |
+| [movies-imdb-min8.json](https://movies.mickschroeder.com/movies-imdb-min8.json) | IMDb rating of 8 or more |
+| [movies-rottentomatoes-min50.json](https://movies.mickschroeder.com/movies-rottentomatoes-min50.json) | Rotten Tomatoes score of 50 or more |
+| [movies-rottentomatoes-min60.json](https://movies.mickschroeder.com/movies-rottentomatoes-min60.json) | Rotten Tomatoes score of 60 or more |
+| [movies-rottentomatoes-min70.json](https://movies.mickschroeder.com/movies-rottentomatoes-min70.json) | Rotten Tomatoes score of 70 or more |
+| [movies-rottentomatoes-min80.json](https://movies.mickschroeder.com/movies-rottentomatoes-min80.json) | Rotten Tomatoes score of 80 or more |
+| [movies-rottentomatoes-audience-min50.json](https://movies.mickschroeder.com/movies-rottentomatoes-audience-min50.json) | Rotten Tomatoes audience score of 50 or more |
+| [movies-rottentomatoes-audience-min60.json](https://movies.mickschroeder.com/movies-rottentomatoes-audience-min60.json) | Rotten Tomatoes audience score of 60 or more |
+| [movies-rottentomatoes-audience-min70.json](https://movies.mickschroeder.com/movies-rottentomatoes-audience-min70.json) | Rotten Tomatoes audience score of 70 or more |
+| [movies-rottentomatoes-audience-min80.json](https://movies.mickschroeder.com/movies-rottentomatoes-audience-min80.json) | Rotten Tomatoes audience score of 80 or more |
+| [movies-mdblist-min50.json](https://movies.mickschroeder.com/movies-mdblist-min50.json) | MDBList score (a blend of all ratings) of 50 or more |
+| [movies-mdblist-min60.json](https://movies.mickschroeder.com/movies-mdblist-min60.json) | MDBList score (a blend of all ratings) of 60 or more |
+| [movies-mdblist-min70.json](https://movies.mickschroeder.com/movies-mdblist-min70.json) | MDBList score (a blend of all ratings) of 70 or more |
+| [movies-mdblist-min80.json](https://movies.mickschroeder.com/movies-mdblist-min80.json) | MDBList score (a blend of all ratings) of 80 or more |
 
+## How it works
+
+1. `bin/build.js` does the work:
+   - Gather - Gets movies from TMDB that came out in the last 180 days. d.
+   - Enrich - Adds ratings from MDBList.
+   - Curate - Asks AI to pick 20 of the movies with at least 500 TMDB votes.
+   - Publish - Checks every list, then writes the files and the static site (`site/`) to
+     `public/`.
+2. The `publish` GitHub Actions workflow runs it nightly, uploads `public/` to S3
+   and refreshes CloudFront. If any check fails, nothing is uploaded and the
+   previous day's files stay live.
+3. The ranking instructions are in [`prompts/rank-movies.md`](prompts/rank-movies.md).
+
+AWS setup is in [`infra/README.md`](infra/README.md).
 
 ## Develop
 
-* Make sure you are running Node.js and a local instance of Redis
+Requires Node.js 24. Create a `.env` file:
 
-* If you want to run it locally you can clone this repository and add a
-  `.env` file which includes the following lines
+```
+TMDB_KEY=
+MDBLIST_KEY=
+ANTHROPIC_API_KEY=
+```
 
-    ```
-    TMDB_KEY=
-    ```
+Then:
 
-  * https://www.themoviedb.org/documentation/api
+```bash
+npm install
+```
 
-* Then run `npm test` and you should see an output of movies showing on
-  your console and the grade it's gotten
+```bash
+npm run build
+```
+
+### Settings
+
+The date window, vote minimums, list size and model effort are constants in
+`config.js`; edit them there. The model can be changed without a code change
+by setting `ANTHROPIC_MODEL` in `.env` or as a GitHub Actions variable
+(default `claude-sonnet-5-5`).
+
+To try it without an Anthropic key, `node bin/build.js --skip-ranking` builds
+everything except `movies.json` and the dated file.
+
+## Credits
+
+This product uses the TMDB API but is not endorsed or certified by TMDB.
 
 ## License
 

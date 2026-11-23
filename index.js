@@ -2,12 +2,41 @@ const Promise = require('bluebird')
 const moment = require('moment')
 const _ = require('lodash')
 const tmdb = require('./lib/tmdb')
-const omdb = require('./lib/omdb')
-const metacritic = require('./lib/metacritic')
+const mdblist = require('./lib/mdblist')
 const anthropic = require('./lib/anthropic')
+const config = require('./config')
 
 const getTmdb = function (tmdbId) {
   return tmdb.getMovie(tmdbId)
+}
+
+// The date Radarr's "Released" minimum availability treats a movie as out:
+// the first US digital (type 4) or physical (type 5) release, or 90 days after
+// the US theatrical release (types 2 and 3) when there's neither.
+const getAvailableDate = function (tmdbMovie, fallbackReleaseDate) {
+  const us = _.find(_.get(tmdbMovie, 'release_dates.results'), { iso_3166_1: 'US' })
+  const firstOfType = types => _.chain(_.get(us, 'release_dates'))
+    .filter(release => types.includes(release.type))
+    .map(release => release.release_date.slice(0, 10))
+    .min()
+    .value()
+
+  const homeRelease = firstOfType([4, 5])
+  if (homeRelease) {
+    return homeRelease
+  }
+
+  return moment(firstOfType([2, 3]) || fallbackReleaseDate).add(90, 'days').format('YYYY-MM-DD')
+}
+
+// Keeps movies that are recent at home: out on digital or disc within the last
+// DAYS_AFTER_AVAILABLE days, or counted as available by Radarr's AVAILABILITY_DELAY.
+// Re-releases of old movies drop out too: their home release is years old.
+const filterRecent = function (movies) {
+  const earliest = moment().subtract(config.DAYS_AFTER_AVAILABLE, 'days').format('YYYY-MM-DD')
+  const latest = moment().subtract(config.AVAILABILITY_DELAY, 'days').format('YYYY-MM-DD')
+
+  return _.filter(movies, movie => movie.available_date >= earliest && movie.available_date <= latest)
 }
 
 const getTmdbDetails = function (movies) {
@@ -19,14 +48,8 @@ const getTmdbDetails = function (movies) {
           return _.assign(movie, {
             tmdb_id: tmdbMovie.id,
             imdb_id: tmdbMovie.imdb_id,
-            budget: tmdbMovie.budget === 0 ? null : tmdbMovie.budget,
+            available_date: getAvailableDate(tmdbMovie, movie.release_date),
             revenue: tmdbMovie.revenue === 0 ? null : tmdbMovie.revenue,
-            top_actors: _.chain(tmdbMovie.credits.cast)
-              .take(3)
-              .map('name')
-              .value(),
-            director: tmdbMovie.credits.crew.find(c => c.job === 'Director')?.name,
-            production_companies: _.map(tmdbMovie.production_companies, 'name'),
             genres: _.chain(tmdbMovie.genres)
               .map('name')
               .map(name => _.snakeCase(name).toLowerCase())
@@ -36,106 +59,52 @@ const getTmdbDetails = function (movies) {
     })
 }
 
-const getOmdbRatings = function (movies) {
-  return Promise
-    .resolve(movies)
-    .mapSeries(function (movie) {
-      return omdb(movie.imdb_id)
-        .then(function (ratings) {
-          return _.defaults(movie, ratings)
-        })
-    })
-}
-
-const normalizeTitle = function (title) {
-  return title.replace(/[^\w]/gi, '').toLowerCase()
-}
-
-const getMetacriticRatings = async function (movies) {
-  const metacriticMovies = await metacritic()
-
-  const mappedMovies = _.chain(metacriticMovies)
-    .keyBy(m => normalizeTitle(m.title))
-    .mapValues('score')
-    .value()
+const getRatings = async function (movies) {
+  const ratings = await mdblist(_.map(movies, 'tmdb_id'))
 
   return movies.map(function (movie) {
-    return _.assign(movie, {
-      metacritic_score: mappedMovies[normalizeTitle(movie.title)]
-    })
+    return _.assign(movie, ratings[movie.tmdb_id])
   })
 }
 
-const evaluateMovies = async function (movies) {
-  const system = `
-You are a movie critic that is given a list of movies released in the last 4 months. Your goal is to suggest and sort order the most popular movies.
+const evaluateMovies = async function (allMovies) {
+  // Only pick movies enough people have rated, so the ratings have settled.
+  // movies.json requires an imdb_id (Radarr matches on it), so skip movies without one.
+  const movies = _.filter(allMovies, movie => movie.imdb_id && _.get(movie, 'vote_count', 0) >= config.MIN_VOTES)
+  console.log({ candidates: allMovies.length, with_min_votes: movies.length, min_votes: config.MIN_VOTES })
 
-You will be given a list of movies with the following details:
+  if (movies.length < config.LIST_SIZE) {
+    throw new Error(`Only ${movies.length} movies have ${config.MIN_VOTES} or more votes, need ${config.LIST_SIZE}. Lower MIN_VOTES or LIST_SIZE.`)
+  }
 
-- Title
-- Production Companies
-- Release Date
-- Genres
-- Budget
-- Revenue
-- Metacritic Score (0-100)
-- Rotten Tomatoes Score (0-100)
-- IMDb Rating (0-10)
-- IMDb Vote Count
-- TMDB Score (0-10)
-- TMDB Vote Count
-- Top 3 actors in the movie
-- Director
-- Writer
-
-When evaluating the popularity of a movie, consider:
-
-- The budget of the movie and and how much revenue it made. Don't consider ROI, just consider how large the spend or revenue is.
-- The number of votes the movie received and the rating of the movie. Be sure to consider the number of votes so that one vote does not skew the results.
-- The production companies of the movie and the quality of the movies they have produced, and how well known the companies are.
-- The actors & directors in the movie and how well known they are.
-
-A null value means that the data could not be found or isn't publicly available.
-
-Explain your reasoning first, then return the IDs of the most popular movies, in sorted order, in a JSON array. Comments in the JSON is invalid JSON.
-
-Include, at most, 15 movies.
-
-Your response should look similar to:
-\`\`\`json
-[
-  123,
-  456,
-  789
-]
-\`\`\`
-`
-
+  // Only what the prompt describes, and no empty fields, to keep the request small
   const moviesData = movies.map(function (movie) {
-    return _.pick(movie, [
+    return _.omitBy(_.pick(movie, [
       'id',
       'title',
-      'production_companies',
-      'release_date',
       'genres',
-      'budget',
       'revenue',
-      'metacritic_score',
+      'rt_audience_score',
       'imdb_rating',
       'imdb_votes',
+      'letterboxd_rating',
+      'letterboxd_votes',
       'rt_score',
-      'vote_average',
-      'vote_count',
-      'top_actors',
-      'director'
-    ])
+      'metacritic_score'
+    ]), _.isNil)
   })
 
-  const response = await anthropic.prompt(system, JSON.stringify(moviesData))
+  const ids = await anthropic.rankMovies(moviesData, config.LIST_SIZE)
 
-  const suggestedMovies = _.map(response, id => movies.find(movie => movie.id === id))
-
-  return suggestedMovies
+  // Drop ids that weren't in the input, so an invented id can't become an empty entry.
+  // If that leaves too few, the size check in bin/build.js fails the run.
+  const byId = _.keyBy(movies, 'id')
+  return _.chain(ids)
+    .uniq()
+    .map(id => byId[id])
+    .compact()
+    .take(config.LIST_SIZE)
+    .value()
 }
 
 const sanatizeForResponse = function (movies) {
@@ -152,39 +121,17 @@ const sanatizeForResponse = function (movies) {
     })
 }
 
-const filterByMinValue = function (key, value = 0) {
+const filterByMinValue = function (key, value) {
   return function (movies) {
+    // No minimum asked for: keep every movie, including ones with no score
+    if (_.isNil(value)) {
+      return movies
+    }
+
     return _.filter(movies, function (movie) {
       return _.get(movie, key, 0) >= value
     })
   }
-}
-
-const filterByMaxValue = function (key, value = 0) {
-  return function (movies) {
-    return _.filter(movies, function (movie) {
-      return _.get(movie, key, 0) <= value
-    })
-  }
-}
-
-const rejectArrayValues = function (key, values) {
-  return function (movies) {
-    if (_.isNil(values)) {
-      return movies
-    }
-
-    return _.reject(movies, function (movie) {
-      return values.some(value => _.get(movie, key, []).includes(value))
-    })
-  }
-}
-
-const calculateMovieAge = function (movies) {
-  return _.map(movies, function (movie) {
-    movie.age = moment().diff(movie.release_date, 'days')
-    return movie
-  })
 }
 
 const logger = function (movies) {
@@ -194,21 +141,20 @@ const logger = function (movies) {
     'tmdb_id',
     'title',
     'release_date',
-    'age',
+    'available_date',
     'metacritic_score',
     'imdb_rating',
     'imdb_votes',
     'rt_score',
+    'rt_audience_score',
+    'letterboxd_rating',
+    'letterboxd_votes',
+    'mdblist_score',
     'popularity',
     'vote_average',
     'vote_count',
     'genres',
-    'budget',
-    'revenue',
-    'production_companies',
-    'top_actors',
-    'director',
-    'writer'
+    'revenue'
   ])
 }
 
@@ -230,12 +176,9 @@ module.exports = (function () {
 
     return Promise
       .resolve(tmdb.getMovies())
-      .then(calculateMovieAge)
-      .then(filterByMaxValue('age', 120))
-      .then(filterByMinValue('age', 0))
       .then(getTmdbDetails)
-      .then(getMetacriticRatings)
-      .then(getOmdbRatings)
+      .then(filterRecent)
+      .then(getRatings)
       .tap(logger)
       .tap(function (movies) {
         allMovies = movies
@@ -250,20 +193,18 @@ module.exports = (function () {
       .then(deduplicateMovies)
       .then(filterByMinValue('metacritic_score', opts.min_metacritic_score))
       .then(filterByMinValue('rt_score', opts.min_rt_score))
+      .then(filterByMinValue('rt_audience_score', opts.min_rt_audience_score))
+      .then(filterByMinValue('mdblist_score', opts.min_mdblist_score))
       .then(filterByMinValue('imdb_rating', opts.min_imdb_rating))
-      .then(rejectArrayValues('genres', opts.exclude_genres))
       .then(sanatizeForResponse)
   }
 
   ListBuilder.prototype.evaluate = function () {
     return Promise
       .resolve(getMovies())
+      .then(deduplicateMovies)
       .then(evaluateMovies)
       .then(sanatizeForResponse)
-  }
-
-  ListBuilder.prototype.dump = function () {
-    return allMovies
   }
 
   return ListBuilder

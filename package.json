@@ -1,40 +1,45 @@
 {
   "name": "popular-movies",
   "version": "0.1.0",
-  "description": "A library to help determine what movies to watch",
+  "description": "New movies you can watch at home, picked by AI every night. Same file names and JSON format as the StevenLu popular-movies lists.",
   "main": "index.js",
   "scripts": {
-    "test": "./bin/test",
-    "deploy": "./bin/deploy.js"
+    "build": "./bin/build.js",
+    "lint": "eslint .",
+    "test": "./bin/test"
+  },
+  "engines": {
+    "node": ">=24"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/sjlu/popular-movies.git"
+    "url": "https://github.com/mick-schroeder/movies.mickschroeder.com.git"
   },
   "keywords": [
-    "movies"
+    "movies",
+    "radarr",
+    "popular-movies"
   ],
-  "author": "Steven Lu <slu@me.com>",
+  "author": "Mick Schroeder, LLC",
+  "contributors": [
+    "Steven Lu (original author, https://github.com/sjlu/popular-movies)"
+  ],
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/sjlu/popular-movies/issues"
+    "url": "https://github.com/mick-schroeder/movies.mickschroeder.com/issues"
   },
-  "homepage": "https://github.com/sjlu/popular-movies",
+  "homepage": "https://movies.mickschroeder.com",
   "devDependencies": {
     "eslint": "^8.30.0",
     "eslint-config-standard": "^17.0.0",
-    "json2csv": "^5.0.7",
     "mocha": "^11.0.1",
     "must": "^0.13.4"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.33.1",
-    "aws-sdk": "^2.1282.0",
+    "@anthropic-ai/sdk": "^1.12.0",
     "bluebird": "^3.7.2",
-    "cheerio": "^1.0.0-rc.12",
     "dotenv": "^16.0.3",
     "lodash": "^4.17.21",
-    "moment": "^2.29.4",
-    "request": "^2.88.2"
+    "moment": "^2.29.4"
   }
 }

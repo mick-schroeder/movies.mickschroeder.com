@@ -1,0 +1,72 @@
+name: publish
+
+# Builds the lists and publishes them to S3 + CloudFront.
+# Runs nightly, or by hand from the Actions tab ("Run workflow").
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # sign in to AWS with OIDC, no stored AWS keys
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+env:
+  SITE_URL: https://movies.mickschroeder.com
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      # Fails without writing anything if any list doesn't pass its checks,
+      # so the live site keeps yesterday's files.
+      - name: Build lists
+        run: npm run build
+        env:
+          TMDB_KEY: ${{ secrets.TMDB_KEY }}
+          MDBLIST_KEY: ${{ secrets.MDBLIST_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Optional: unset uses the default in config.js
+          ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      # No --delete: dated files from earlier days stay in the bucket
+      - name: Upload to S3
+        run: aws s3 sync public/ "s3://${{ vars.AWS_BUCKET }}/" --cache-control "public, max-age=3600" --no-progress
+
+      - name: Refresh CloudFront cache
+        run: |
+          id=$(aws cloudfront create-invalidation \
+            --distribution-id "${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}" \
+            --paths "/*" --query Invalidation.Id --output text)
+          aws cloudfront wait invalidation-completed \
+            --distribution-id "${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}" --id "$id"
+
+      - name: Check the live site matches this build
+        run: |
+          for file in movies.json "movies-$(date -u +%Y%m%d).json" all-movies.json; do
+            curl -fsS --compressed "$SITE_URL/$file" -o live.json
+            if ! cmp -s live.json "public/$file"; then
+              echo "::error::$SITE_URL/$file does not match this build"
+              exit 1
+            fi
+            echo "$file OK ($(jq length live.json) movies)"
+          done
