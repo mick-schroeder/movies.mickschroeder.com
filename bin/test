@@ -1,7 +1,0 @@
-#!/bin/bash
-
-set -o errexit
-set -o pipefail
-set -o nounset
-
-NODE_ENV=test ./node_modules/.bin/mocha --exit

@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >-
-  movies.mickschroeder.com: private S3 bucket behind CloudFront with HTTPS on a
+  movies.mickschroeder.com: S3 static website behind CloudFront with HTTPS on a
   Route 53 domain, plus an IAM role GitHub Actions assumes with OIDC to publish.
   Deploy in us-east-1 (CloudFront certificates must live there).
 
@@ -43,11 +43,17 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
+      # Public read through the bucket policy (the site and its JSON are public anyway);
+      # ACLs stay off
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
-        BlockPublicPolicy: true
+        BlockPublicPolicy: false
         IgnorePublicAcls: true
-        RestrictPublicBuckets: true
+        RestrictPublicBuckets: false
+      # Serves /tonight/ as tonight/index.html, and 404.html for missing pages
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: 404.html
       OwnershipControls:
         Rules:
           - ObjectOwnership: BucketOwnerEnforced
@@ -59,7 +65,7 @@ Resources:
         Status: Enabled
       LifecycleConfiguration:
         Rules:
-          # Overwritten files (movies.json etc.) keep old versions for a week, for rollback
+          # Overwritten files (best-pictures.json etc.) keep old versions for a week, for rollback
           - Id: ExpireOldVersions
             Status: Enabled
             NoncurrentVersionExpiration:
@@ -72,15 +78,11 @@ Resources:
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
-          - Sid: AllowCloudFrontRead
+          - Sid: PublicRead
             Effect: Allow
-            Principal:
-              Service: cloudfront.amazonaws.com
+            Principal: '*'
             Action: s3:GetObject
             Resource: !Sub '${Bucket.Arn}/*'
-            Condition:
-              StringEquals:
-                AWS:SourceArn: !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${Distribution}'
 
   Certificate:
     Type: AWS::CertificateManager::Certificate
@@ -91,15 +93,6 @@ Resources:
         - DomainName: !Ref DomainName
           HostedZoneId: !Ref HostedZoneId
 
-  OriginAccessControl:
-    Type: AWS::CloudFront::OriginAccessControl
-    Properties:
-      OriginAccessControlConfig:
-        Name: !Sub '${AWS::StackName}-oac'
-        OriginAccessControlOriginType: s3
-        SigningBehavior: always
-        SigningProtocol: sigv4
-
   Distribution:
     Type: AWS::CloudFront::Distribution
     Properties:
@@ -108,7 +101,6 @@ Resources:
         Comment: !Ref DomainName
         Aliases:
           - !Ref DomainName
-        DefaultRootObject: index.html
         HttpVersion: http2and3
         IPV6Enabled: true
         PriceClass: PriceClass_100
@@ -117,11 +109,11 @@ Resources:
           SslSupportMethod: sni-only
           MinimumProtocolVersion: TLSv1.2_2021
         Origins:
+          # The bucket's website endpoint (http://<host>), which only speaks HTTP
           - Id: s3
-            DomainName: !GetAtt Bucket.RegionalDomainName
-            OriginAccessControlId: !GetAtt OriginAccessControl.Id
-            S3OriginConfig:
-              OriginAccessIdentity: ''
+            DomainName: !Select [2, !Split ['/', !GetAtt Bucket.WebsiteURL]]
+            CustomOriginConfig:
+              OriginProtocolPolicy: http-only
         DefaultCacheBehavior:
           TargetOriginId: s3
           ViewerProtocolPolicy: redirect-to-https

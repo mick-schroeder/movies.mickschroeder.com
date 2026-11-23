@@ -1,43 +1,72 @@
 {
   "name": "movie-standings",
-  "version": "0.1.0",
-  "description": "The year's best movies, ranked by AI every night, with every movie's rise and fall charted across the year.",
-  "main": "index.js",
-  "scripts": {
-    "build": "./bin/build.js",
-    "lint": "eslint .",
-    "test": "./bin/test"
-  },
-  "engines": {
-    "node": ">=24"
-  },
+  "version": "0.2.0",
+  "description": "Movies from the past year, recommended and ranked nightly by our AI editor.",
+  "type": "module",
+  "private": true,
+  "homepage": "https://movies.mickschroeder.com",
   "repository": {
     "type": "git",
-    "url": "https://github.com/mick-schroeder/movies.mickschroeder.com.git"
+    "url": "git+https://github.com/mick-schroeder/movies.mickschroeder.com.git"
   },
-  "keywords": [
-    "movies",
-    "popular-movies"
-  ],
+  "bugs": {
+    "url": "https://github.com/mick-schroeder/movies.mickschroeder.com/issues"
+  },
+  "license": "MIT",
   "author": "Mick Schroeder, LLC",
   "contributors": [
     "Steven Lu (original author, https://github.com/sjlu/popular-movies)"
   ],
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/mick-schroeder/movies.mickschroeder.com/issues"
+  "engines": {
+    "node": ">=22.18"
   },
-  "homepage": "https://movies.mickschroeder.com",
-  "devDependencies": {
-    "eslint": "^8.30.0",
-    "eslint-config-standard": "^17.0.0",
-    "mocha": "^11.0.1",
-    "must": "^0.13.4"
+  "packageManager": "pnpm@12.18.0",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "build:data": "node --env-file-if-exists=.env pipeline/build.ts",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "astro check",
+    "test": "node --env-file-if-exists=.env --test",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.12.0",
-    "dotenv": "^16.0.3",
-    "lodash": "^4.17.21",
-    "moment": "^2.29.4"
+    "@astrojs/react": "^7",
+    "@astrojs/sitemap": "^3.7.6",
+    "@base-ui/react": "^1.9.0",
+    "@tailwindcss/vite": "^4",
+    "astro": "^7.4.8",
+    "class-variance-authority": "^0.7.1",
+    "cn": "^0.5.2",
+    "d3": "^7.9.0",
+    "lucide-react": "^1.77.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "simple-icons": "16.37.0",
+    "tailwindcss": "^4",
+    "tw-animate-css": "^1.4.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9",
+    "@eslint/js": "^10",
+    "@types/d3": "^7.4.3",
+    "@types/node": "^24",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^10",
+    "eslint-plugin-astro": "^1",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17",
+    "prettier": "^3.9.10",
+    "prettier-plugin-astro": "^1.1.2",
+    "prettier-plugin-tailwindcss": "^0.8.1",
+    "shadcn": "^4.23.0",
+    "typescript": "~6.0.2",
+    "typescript-eslint": "^8"
   }
 }

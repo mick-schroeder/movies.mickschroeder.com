@@ -1,0 +1,36 @@
+---
+// <head> contents shared by every page: meta, social cards, structured data.
+import { Font } from "astro:assets"
+export interface Props {
+  title: string
+  description: string
+  /** Structured data (schema.org) for this page. */
+  jsonLd?: Record<string, unknown>[]
+}
+
+const { title, description, jsonLd = [] } = Astro.props
+const canonical = new URL(Astro.url.pathname, Astro.site)
+---
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{title}</title>
+<meta name="description" content={description} />
+<link rel="canonical" href={canonical} />
+<!-- Not preloaded: only devices without Helvetica download it -->
+<Font cssVariable="--font-inter-tight" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="sitemap" href="/sitemap-index.xml" />
+<meta name="theme-color" content="#000000" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content={title} />
+<meta property="og:description" content={description} />
+<meta property="og:url" content={canonical} />
+<meta name="twitter:card" content="summary" />
+{jsonLd.map((data) => (
+  <script
+    is:inline
+    type="application/ld+json"
+    set:html={JSON.stringify({ "@context": "https://schema.org", ...data })}
+  />
+))}

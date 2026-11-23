@@ -1,0 +1,72 @@
+---
+import BaseHead, {
+  type Props as HeadProps,
+} from "@/components/site/base-head.astro"
+import SiteFooter from "@/components/site/site-footer.astro"
+import SiteHeader from "@/components/site/site-header.astro"
+import BrandIcon from "@/components/brand-icon.astro"
+import { siGithub, siMdblist, siThemoviedatabase } from "simple-icons"
+import { SITE } from "@/consts"
+import { ClientRouter } from "astro:transitions"
+import "@/styles/global.css"
+
+type Props = HeadProps & {
+  /** Leave the header's site title out, when the page shows it large itself. */
+  hideTitle?: boolean
+}
+const { hideTitle = false, ...head } = Astro.props
+---
+
+<html lang="en">
+  <head>
+    <BaseHead {...head} />
+    <ClientRouter />
+  </head>
+  <body class="flex min-h-svh flex-col antialiased">
+    <SiteHeader hideTitle={hideTitle} />
+    <main class="flex-1">
+      <slot />
+    </main>
+    <div class="px-4 sm:px-6">
+      <SiteFooter code={SITE.code}>
+        <div class="flex flex-col gap-2">
+          <p class="flex items-center gap-2">
+            <BrandIcon icon={siGithub} />
+            <span>
+              Based on{" "}
+              <a
+                href="https://github.com/sjlu/popular-movies"
+                class="underline hover:text-foreground"
+              >
+                popular-movies
+              </a>{" "}
+              by Steven Lu.
+            </span>
+          </p>
+          <p class="flex items-center gap-2">
+            <BrandIcon icon={siMdblist} />
+            <span>
+              Ratings data from{" "}
+              <a
+                href="https://mdblist.com/"
+                class="underline hover:text-foreground"
+              >
+                MDBList
+              </a>
+              .
+            </span>
+          </p>
+          <p class="flex items-center gap-2">
+            <a href="https://www.themoviedb.org/" aria-label="TMDB">
+              <BrandIcon icon={siThemoviedatabase} />
+            </a>
+            <span>
+              This product uses the TMDB API but is not endorsed or certified by
+              TMDB.
+            </span>
+          </p>
+        </div>
+      </SiteFooter>
+    </div>
+  </body>
+</html>
