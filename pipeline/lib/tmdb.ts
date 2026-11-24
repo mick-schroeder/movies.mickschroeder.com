@@ -19,10 +19,22 @@ interface TmdbPage {
 
 export interface TmdbDetails {
   id: number
+  title: string
   imdb_id: string | null
+  poster_path: string | null
   release_date?: string
   revenue: number
+  runtime: number | null
   genres: { id: number; name: string }[]
+  videos: { results: TmdbVideo[] }
+}
+
+interface TmdbVideo {
+  site: string
+  type: string
+  key: string
+  official: boolean
+  iso_639_1: string
 }
 
 // On a 429, waits for Retry-After (1s if missing) and tries again, up to `retries` times
@@ -48,6 +60,30 @@ async function request<T>(
   return resp.json() as Promise<T>
 }
 
+export const posterUrl = (path: string | null) =>
+  path ? config.TMDB_POSTER_URL + path : null
+
+// "Science Fiction" -> "science_fiction"
+export const genreSlugs = (details: TmdbDetails) =>
+  details.genres.map((genre) =>
+    genre.name
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter(Boolean)
+      .join("_")
+  )
+
+/** The movie's YouTube trailer, official and English first, or null. */
+export function trailerUrl(details: TmdbDetails) {
+  const trailers = details.videos.results.filter(
+    (video) => video.site === "YouTube" && video.type === "Trailer"
+  )
+  const rank = (video: TmdbVideo) =>
+    Number(!video.official) + Number(video.iso_639_1 !== "en")
+  const best = trailers.toSorted((a, b) => rank(a) - rank(b))[0]
+  return best ? `https://www.youtube.com/watch?v=${best.key}` : null
+}
+
 const formatMovie = (movie: TmdbMovie): Movie => ({
   id: movie.id,
   title: movie.title,
@@ -55,9 +91,7 @@ const formatMovie = (movie: TmdbMovie): Movie => ({
   popularity: movie.popularity,
   vote_average: movie.vote_average,
   vote_count: movie.vote_count,
-  poster_url: movie.poster_path
-    ? config.TMDB_POSTER_URL + movie.poster_path
-    : null,
+  poster_url: posterUrl(movie.poster_path),
 })
 
 const isoDate = (date: Date) => date.toISOString().slice(0, 10)
@@ -92,7 +126,9 @@ export async function getMovies(): Promise<Movie[]> {
 }
 
 export function getMovie(id: number) {
-  return request<TmdbDetails>(`/movie/${id}`, {})
+  return request<TmdbDetails>(`/movie/${id}`, {
+    append_to_response: "videos",
+  })
 }
 
 /** The TMDB id for an IMDb id, or null if TMDB doesn't know it. */

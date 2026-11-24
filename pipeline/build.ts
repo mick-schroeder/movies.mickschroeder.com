@@ -1,84 +1,72 @@
 // Writes tonight's data into ./public, where `astro build` publishes it:
-// best-pictures.json (tonight's standings) and best-pictures-YYYY.json (this year's rank history).
+//   best-pictures.json            tonight's standings (Steven Lu's format)
+//   best-pictures-YYYYMMDD.json   the same list, kept under tonight's date
+//   data/*.json                   the rankings, movie details and scores carried to tomorrow
 //
 // Everything is checked before anything is written, so a bad run
 // leaves no output and the live site keeps yesterday's files.
 //
 // Usage:
 //   pnpm build:data                  nightly build (needs TMDB, MDBList and Anthropic keys)
-//   pnpm build:data --new-history    start the history if the live site has none yet: this year
-//                                    and every past year back to FIRST_YEAR, backfilled from
-//                                    Steven Lu's nightly lists (first run only; on Jan 1 a new
-//                                    year starts empty without it)
-import { writeFileSync } from "node:fs"
-import { FIRST_YEAR } from "../src/consts.ts"
+//   pnpm build:data --new-history    start the data if the live site has none yet, backfilled
+//                                    from Steven Lu's nightly lists, with a dated file for
+//                                    each of his nights (first run only)
+import { mkdirSync, writeFileSync } from "node:fs"
 import config from "./config.ts"
-import * as history from "./lib/history.ts"
+import * as data from "./lib/data.ts"
 import validateList from "./lib/validate.ts"
 import { backfill } from "./lib/stevenlu.ts"
-import { getMovies, rankMovies, toList } from "./rank.ts"
+import { getMovies, rankMovies } from "./rank.ts"
 
 const OUTPUT_DIR = new URL("../public/", import.meta.url)
 
 const today = new Date().toISOString().slice(0, 10)
-const year = Number(today.slice(0, 4))
 
-// This year's file is only allowed to be missing when the year just started,
-// or on the very first run (--new-history), which backfills from Steven Lu's lists
 const newHistory = process.argv.includes("--new-history")
-const allowMissing = newHistory || today.endsWith("-01-01")
-const thisYear =
-  (await history.load(year, { allowMissing })) ??
-  (newHistory ? await backfill(year, today) : history.empty(year))
-// Past years the live site doesn't have yet, all from Steven Lu's lists
-const pastYears = []
-for (let y = FIRST_YEAR; newHistory && y < year; y++) {
-  if (await history.load(y, { allowMissing: true })) continue
-  const past = await backfill(y, `${y + 1}-01-01`)
-  history.validate(past)
-  pastYears.push(past)
-  console.log({ backfilled: y, days: past.days.length })
-}
-const lastYear =
-  pastYears.find((h) => h.year === year - 1) ??
-  (await history.load(year - 1, { allowMissing: true }))
-console.log({
-  history_days: thisYear.days.length,
-  last_year_days: lastYear?.days.length ?? 0,
-})
-
-// Last night's standing scores; on Jan 1 they're in last year's file
-const previousScores =
-  (thisYear.days.length ? thisYear.scores : lastYear?.scores) ?? {}
+const saved = await data.load({ allowMissing: newHistory })
+const backfilled = saved ? null : await backfill(today)
+const previous: data.Data = saved ?? { ...backfilled!, scores: {} }
+console.log({ history_nights: previous.rankings.length })
 
 const movies = await getMovies()
-const { ranked, scores } = await rankMovies(movies, previousScores)
+const { ranked, scores } = await rankMovies(movies, previous.scores)
+const updated = data.addNight(previous, today, ranked, scores)
+data.validate(updated)
 
-const list = toList(ranked)
-validateList("best-pictures.json", list, {
+// Tonight's list, and on a backfill one for each of Steven Lu's nights
+const nights = backfilled ? updated.rankings : updated.rankings.slice(-1)
+const lists = nights.map((night) => ({
+  name: data.datedFilename(night.date),
+  list: data.toList(night.ids, updated.catalog),
+}))
+for (const { name, list } of lists) {
+  validateList(name, list, {
+    min: 1,
+    max: config.LIST_SIZE,
+    requireImdbId: true,
+  })
+}
+const tonight = lists.at(-1)!.list
+validateList("best-pictures.json", tonight, {
   min: config.LIST_SIZE,
   max: config.LIST_SIZE,
   requireImdbId: true,
 })
 
-const updated = history.addDay(thisYear, today, ranked, scores)
-history.validate(updated)
-
 // Everything passed: write it out
-for (const past of pastYears) {
-  writeFileSync(
-    new URL(history.filename(past.year), OUTPUT_DIR),
-    JSON.stringify(past)
-  )
-}
-writeFileSync(new URL("best-pictures.json", OUTPUT_DIR), JSON.stringify(list))
-writeFileSync(
-  new URL(history.filename(year), OUTPUT_DIR),
-  JSON.stringify(updated)
-)
+const write = (name: string, value: unknown) =>
+  writeFileSync(new URL(name, OUTPUT_DIR), JSON.stringify(value))
+
+mkdirSync(new URL("data/", OUTPUT_DIR), { recursive: true })
+write(data.FILES.rankings, updated.rankings)
+write(data.FILES.catalog, updated.catalog)
+write(data.FILES.scores, updated.scores)
+for (const { name, list } of lists) write(name, list)
+write("best-pictures.json", tonight)
 
 console.log({
-  movies: list.length,
-  history_days: updated.days.length,
-  history_movies: Object.keys(updated.movies).length,
+  movies: tonight.length,
+  dated_files: lists.length,
+  history_nights: updated.rankings.length,
+  history_movies: Object.keys(updated.catalog).length,
 })

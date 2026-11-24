@@ -9,7 +9,7 @@ export default {
   MDBLIST_KEY: env("MDBLIST_KEY"),
   ANTHROPIC_API_KEY: env("ANTHROPIC_API_KEY"),
   ANTHROPIC_MODEL: env("ANTHROPIC_MODEL", "claude-haiku-5-5"),
-  // Where the build downloads earlier rank history (best-pictures-YYYY.json) from
+  // Where the build downloads earlier data (data/*.json) from
   SITE_URL: env("SITE_URL", "https://movies.mickschroeder.com"),
 
   TMDB_POSTER_URL: "https://image.tmdb.org/t/p/w500",

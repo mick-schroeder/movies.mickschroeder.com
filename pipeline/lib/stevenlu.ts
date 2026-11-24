@@ -1,16 +1,18 @@
-// Backfills a year's rank history from Steven Lu's popular-movies lists
+// Backfills the rankings from Steven Lu's popular-movies lists
 // (https://github.com/sjlu/popular-movies), the project this one forked from.
 // He publishes each night's list as movies-YYYYMMDD.json; some nights are missing.
 import { gunzipSync } from "node:zlib"
-import type { ListMovie, RankHistory } from "../../src/lib/types.ts"
+import type { Catalog, ListMovie, RankDay } from "../../src/lib/types.ts"
 import config from "../config.ts"
 import getRatings from "./mdblist.ts"
 import * as tmdb from "./tmdb.ts"
 
 const BASE_URL = "https://popular-movies-data.stevenlu.com"
+/** His first dated list. */
+const FIRST_DATE = "2019-12-02"
 
-// Lists before 2023 have only an imdb_id
-type StevenLuMovie = Omit<ListMovie, "tmdb_id"> & { tmdb_id?: number }
+// Lists before 2023 have only an imdb_id (and no genres)
+type StevenLuMovie = Partial<ListMovie> & { imdb_id?: string }
 
 async function getList(date: string): Promise<StevenLuMovie[] | null> {
   const resp = await fetch(
@@ -36,17 +38,14 @@ async function tmdbId(movie: StevenLuMovie) {
   return tmdbIds.get(movie.imdb_id)!
 }
 
-/** Every night of `year` before `until` (YYYY-MM-DD) that has a Steven Lu list, marked as his. */
+/** Every night before `until` (YYYY-MM-DD) that has a Steven Lu list, marked as his, and the movies in them. */
 export async function backfill(
-  year: number,
   until: string
-): Promise<RankHistory> {
-  const history: RankHistory = { year, days: [], movies: {}, scores: {} }
-
+): Promise<{ rankings: RankDay[]; catalog: Catalog }> {
   const dates: string[] = []
-  for (let t = Date.UTC(year, 0, 1); ; t += 86400000) {
+  for (let t = Date.parse(FIRST_DATE); ; t += 86400000) {
     const date = new Date(t).toISOString().slice(0, 10)
-    if (date >= until || !date.startsWith(`${year}-`)) break
+    if (date >= until) break
     dates.push(date)
   }
 
@@ -56,6 +55,8 @@ export async function backfill(
     lists.push(...(await Promise.all(dates.slice(i, i + 10).map(getList))))
   }
 
+  const rankings: RankDay[] = []
+  const imdbIds = new Map<number, string>()
   for (const [i, date] of dates.entries()) {
     const list = lists[i]
     if (!list) continue
@@ -67,27 +68,32 @@ export async function backfill(
       const id = await tmdbId(movie)
       if (id === null || !movie.imdb_id || ids.includes(id)) continue
       ids.push(id)
-      history.movies[id] ??= {
-        title: movie.title,
-        imdb_id: movie.imdb_id,
-        poster_url: movie.poster_url?.replace(/^http:/, "https:") ?? null,
-        release_date: null,
-      }
+      imdbIds.set(id, movie.imdb_id)
     }
-    if (ids.length) history.days.push({ date, ids, source: "stevenlu" })
+    if (ids.length) rankings.push({ date, ids, source: "stevenlu" })
   }
 
-  // His lists have no release dates or links to other sites, so look them up
-  const ratings = await getRatings(Object.keys(history.movies).map(Number))
-  for (const [id, movie] of Object.entries(history.movies)) {
-    movie.release_date = (await tmdb.getMovie(Number(id))).release_date || null
+  // His lists vary in what they include, so every movie's details come from TMDB
+  const ratings = await getRatings([...imdbIds.keys()])
+  const catalog: Catalog = {}
+  for (const [id, imdbId] of imdbIds) {
+    const details = await tmdb.getMovie(id)
     const links = ratings[id]?.links
-    if (links) movie.links = links
+    catalog[id] = {
+      title: details.title,
+      imdb_id: details.imdb_id || imdbId,
+      poster_url: tmdb.posterUrl(details.poster_path),
+      release_date: details.release_date || null,
+      genres: tmdb.genreSlugs(details),
+      runtime: details.runtime || null,
+      trailer_url: tmdb.trailerUrl(details),
+      ...(links && Object.keys(links).length && { links }),
+    }
   }
 
   console.log({
-    stevenlu_days: history.days.length,
-    stevenlu_movies: Object.keys(history.movies).length,
+    stevenlu_nights: rankings.length,
+    stevenlu_movies: Object.keys(catalog).length,
   })
-  return history
+  return { rankings, catalog }
 }

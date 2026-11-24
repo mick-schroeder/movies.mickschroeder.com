@@ -9,6 +9,7 @@ dist/
 # nightly data, written by `pnpm build:data`
 public/best-pictures.json
 public/best-pictures-*.json
+public/data/
 
 # environment variables
 .env*

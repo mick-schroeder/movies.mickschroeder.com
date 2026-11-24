@@ -1,17 +1,8 @@
-import type { ListMovie } from "../src/lib/types.ts"
 import config from "./config.ts"
 import { scoreMovies } from "./lib/anthropic.ts"
 import getRatings from "./lib/mdblist.ts"
 import * as tmdb from "./lib/tmdb.ts"
 import type { Movie, Scores } from "./lib/types.ts"
-
-// "Science Fiction" -> "science_fiction"
-const snakeCase = (name: string) =>
-  name
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter(Boolean)
-    .join("_")
 
 async function addTmdbDetails(movies: Movie[]) {
   for (const movie of movies) {
@@ -20,7 +11,9 @@ async function addTmdbDetails(movies: Movie[]) {
       tmdb_id: details.id,
       imdb_id: details.imdb_id,
       revenue: details.revenue === 0 ? null : details.revenue,
-      genres: details.genres.map((genre) => snakeCase(genre.name)),
+      genres: tmdb.genreSlugs(details),
+      runtime: details.runtime || null,
+      trailer_url: tmdb.trailerUrl(details),
     })
   }
 }
@@ -137,13 +130,3 @@ export function pickTop<T extends { id: number }>(movies: T[], scores: Scores) {
     .slice(0, config.LIST_SIZE)
   return { ranked, scores }
 }
-
-// The published v1 format (see lib/validate.ts)
-export const toList = (movies: Movie[]): ListMovie[] =>
-  movies.map(({ title, tmdb_id, imdb_id, poster_url, genres }) => ({
-    title,
-    tmdb_id: tmdb_id!,
-    imdb_id: imdb_id!,
-    poster_url,
-    genres: genres ?? [],
-  }))

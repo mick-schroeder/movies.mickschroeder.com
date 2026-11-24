@@ -12,7 +12,7 @@ Each night AI scores every movie released in the last 365 days (0-100, how stron
   - `imdb_id` (string like `tt1234567`)
   - `poster_url` (string URL to a TMDB poster image)
   - `genres` (array of snake_case strings, e.g. `science_fiction`)
-- `https://movies.mickschroeder.com/best-pictures-YYYY.json`: every night's standings for a calendar year, e.g. [best-pictures-2026.json](https://movies.mickschroeder.com/best-pictures-2026.json); files exist from 2019. An object with `year`, `days` (array of `{ date: "YYYY-MM-DD", ids: [tmdb_id, ...] }`, best first, oldest day first) `movies` (map of tmdb_id to `{ title, imdb_id, poster_url, release_date, links? }`, where the optional `links` has full URLs for any of `rottentomatoes`, `metacritic`, `letterboxd`, `trakt`) and `scores` (map of tmdb_id to standing score, 0-100, after the latest night). Days with `"source": "stevenlu"` were backfilled from [Steven Lu's popular-movies](https://github.com/sjlu/popular-movies) nightly lists (15 recent movies, his order) from before this site ranked its own; other days are this site's AI standings.
+- `https://movies.mickschroeder.com/best-pictures-YYYYMMDD.json`: one night's standings in the same format, like Steven Lu's dated `movies-YYYYMMDD.json`, e.g. `best-pictures-20261123.json` (dates are UTC). Files exist from Dec 2, 2019. Nights before this site ranked its own are [Steven Lu's popular-movies](https://github.com/sjlu/popular-movies) lists (15 recent movies, his order); some nights are missing.
 
 ## Optional
 

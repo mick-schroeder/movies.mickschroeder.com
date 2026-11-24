@@ -4,7 +4,7 @@
 // shows), smoothed over about two weeks so nightly wobbles don't show.
 import { bisector, randomLcg } from "d3"
 import { LIST_SIZE as MAX_RANK } from "@/consts"
-import type { RankDay, RankHistory } from "@/lib/types"
+import type { Catalog, RankDay } from "@/lib/types"
 
 const SMOOTH_DAYS = 15
 // A missed night takes the night before; a longer gap shows as no data
@@ -24,6 +24,14 @@ export function wobble(id: string) {
   const [a, b] = [rand() * 2 * Math.PI, rand() * 2 * Math.PI]
   return (px: number) =>
     WOBBLE_PX * (0.6 * Math.sin(px * 0.05 + a) + 0.4 * Math.sin(px * 0.13 + b))
+}
+
+/** What a chart draws: some nights' standings and the movies in them. */
+export interface ChartData {
+  /** The calendar year shown, or for the last 365 days the latest night's. */
+  year: number
+  days: RankDay[]
+  movies: Catalog
 }
 
 export interface Ridge {
@@ -86,7 +94,7 @@ export function ridgeline(
 }
 
 // Rows in the order movies joined the standings
-export function ridges(data: RankHistory, start: number, end: number): Ridge[] {
+export function ridges(data: ChartData, start: number, end: number): Ridge[] {
   const latest = data.days.at(-1)?.ids ?? []
   const ranks: Record<string, Record<string, number>> = {}
   const order: string[] = []
@@ -122,24 +130,32 @@ export function ridges(data: RankHistory, start: number, end: number): Ridge[] {
   })
 }
 
-/** The last 365 days of rank history across this year's and last year's files. */
-export function pastYear(histories: RankHistory[]): RankHistory {
-  const all = histories.toSorted((a, b) => a.year - b.year)
-  const days = all.flatMap((h) => h.days)
-  const latest = days.at(-1)
+/** One calendar year's nights. */
+export const yearOf = (
+  rankings: RankDay[],
+  movies: Catalog,
+  year: number
+): ChartData => ({
+  year,
+  days: rankings.filter((day) => day.date.startsWith(`${year}-`)),
+  movies,
+})
+
+/** The last 365 days of nights, up to the latest. */
+export function pastYear(rankings: RankDay[], movies: Catalog): ChartData {
+  const latest = rankings.at(-1)
   const from = latest
     ? new Date(utc(latest.date) - 364 * DAY).toISOString().slice(0, 10)
     : ""
   return {
-    year: all.at(-1)?.year ?? new Date().getUTCFullYear(),
-    days: days.filter((day) => day.date >= from),
-    movies: Object.assign({}, ...all.map((h) => h.movies)),
-    scores: all.at(-1)?.scores ?? {},
+    year: Number(latest?.date.slice(0, 4)) || new Date().getUTCFullYear(),
+    days: rankings.filter((day) => day.date >= from),
+    movies,
   }
 }
 
 /** First and last day the chart shows: the whole year, or up to the latest night. */
-export function yearSpan(data: RankHistory) {
+export function yearSpan(data: { year: number; days: RankDay[] }) {
   const start = Date.UTC(data.year, 0, 1)
   const latest = data.days[data.days.length - 1]
   const end = Math.min(

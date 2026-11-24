@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       new_history:
-        description: Start the rank history, backfilling every year back to 2019 (first run only)
+        description: Start the data, backfilling every night back to Dec 2019 from Steven Lu's lists (first run only)
         type: boolean
         default: false
 
@@ -58,7 +58,7 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: us-east-1
 
-      # No --delete: earlier years' best-pictures-YYYY.json files stay in the bucket.
+      # No --delete: earlier nights' best-pictures-YYYYMMDD.json files stay in the bucket.
       # Astro's hashed assets never change, so they cache for a year.
       - name: Upload to S3
         run: |
@@ -75,7 +75,7 @@ jobs:
 
       - name: Check the live site matches this build
         run: |
-          for file in best-pictures.json "best-pictures-$(date -u +%Y).json"; do
+          for file in best-pictures.json "best-pictures-$(date -u +%Y%m%d).json" data/rankings.json; do
             curl -fsS --compressed "$SITE_URL/$file" -o live.json
             if ! cmp -s live.json "dist/$file"; then
               echo "::error::$SITE_URL/$file does not match this build"

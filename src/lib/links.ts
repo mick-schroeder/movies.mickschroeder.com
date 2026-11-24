@@ -1,22 +1,23 @@
 import type { MovieSummary } from "@/lib/movies"
 
-/** Where else to find a movie, best known first. */
+/** Where else to find a movie, best known first. Most are built from its ids. */
 export function movieLinks(movie: MovieSummary) {
-  const { id, imdb_id, links = {} } = movie
+  const { id, imdb_id, trailer_url, links = {} } = movie
   return [
+    trailer_url && { name: "Trailer", url: trailer_url },
     { name: "TMDB", url: `https://www.themoviedb.org/movie/${id}` },
     { name: "IMDb", url: `https://www.imdb.com/title/${imdb_id}/` },
-    {
-      name: "Letterboxd",
-      url: links.letterboxd ?? `https://letterboxd.com/tmdb/${id}/`,
-    },
+    { name: "Letterboxd", url: `https://letterboxd.com/tmdb/${id}/` },
     { name: "MDBList", url: `https://mdblist.com/movie/${imdb_id}` },
     links.rottentomatoes && {
       name: "Rotten Tomatoes",
       url: links.rottentomatoes,
     },
     links.metacritic && { name: "Metacritic", url: links.metacritic },
-    links.trakt && { name: "Trakt", url: links.trakt },
+    {
+      name: "Trakt",
+      url: `https://trakt.tv/search/tmdb/${id}?id_type=movie`,
+    },
   ].filter((link) => !!link)
 }
 

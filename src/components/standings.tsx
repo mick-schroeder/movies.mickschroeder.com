@@ -1,5 +1,5 @@
 // The year's standings, as a chart or as posters, under one set of filters.
-// The chart is a ridgeline, one ridge per movie (best-pictures-YYYY.json), drawn
+// The chart is a ridgeline, one ridge per movie (data/rankings.json), drawn
 // edge to edge like a hand-inked plot. A ridge's height each night is how high the movie
 // ranked (#1 tallest, off the list flat; squared so the top spots stand out), smoothed
 // over two weeks so nightly wobbles don't show. Later rows are drawn on top.
@@ -37,6 +37,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
+  type ChartData,
   DAY,
   formatDate,
   pastYear,
@@ -44,13 +45,14 @@ import {
   ridges,
   utc,
   wobble,
+  yearOf,
   yearSpan,
 } from "@/lib/ridgeline"
 import { CopyUrl } from "@/components/copy-url"
 import { SITE } from "@/consts"
 import { moviePath } from "@/lib/links"
 import { genreLabel } from "@/lib/utils"
-import type { RankHistory } from "@/lib/types"
+import type { Catalog, RankDay } from "@/lib/types"
 
 /**
  * Row spacing, title size, title column width, longest title (in characters) and
@@ -125,7 +127,7 @@ function facts(d: Ridge, current: boolean): Record<Order, string | null> {
 
 // What the chart shows: one calendar year, or tonight's movies over the last 365 days
 interface View {
-  data: RankHistory
+  data: ChartData
   current: boolean
 }
 
@@ -303,10 +305,18 @@ function draw(
   }
 }
 
-const load = (year: number): Promise<RankHistory | null> =>
-  fetch(`/best-pictures-${year}.json`)
+const fetchJson = <T,>(path: string): Promise<T | null> =>
+  fetch(path)
     .then((resp) => (resp.ok ? resp.json() : null))
     .catch(() => null)
+
+// Every night's standings and the movies in them, fetched once for every view
+let history: Promise<[RankDay[] | null, Catalog | null]> | undefined
+const loadHistory = () =>
+  (history ??= Promise.all([
+    fetchJson<RankDay[]>("/data/rankings.json"),
+    fetchJson<Catalog>("/data/movies.json"),
+  ]))
 
 const CURRENT = "current"
 type Choice = typeof CURRENT | `${number}`
@@ -456,17 +466,18 @@ export function Standings({
   useEffect(() => {
     let cancelled = false
     const current = choice === CURRENT
-    const wanted = current ? years.slice(0, 2) : [Number(choice)]
-    Promise.all(wanted.map(load)).then((found) => {
+    loadHistory().then(([rankings, movies]) => {
       if (cancelled) return
-      const histories = found.filter((h): h is RankHistory => !!h)
-      const history = current ? pastYear(histories) : histories[0]
-      setData(history?.days.length ? { data: history, current } : null)
+      if (!rankings || !movies) return setData(null)
+      const shown = current
+        ? pastYear(rankings, movies)
+        : yearOf(rankings, movies, Number(choice))
+      setData(shown.days.length ? { data: shown, current } : null)
     })
     return () => {
       cancelled = true
     }
-  }, [choice, years])
+  }, [choice])
 
   const choose = (value: Choice) => {
     setChoice(value)
@@ -506,7 +517,6 @@ export function Standings({
   // Before the history loads (and on the server), posters are tonight's 25.
   // Kept between hovers, which re-render this.
   const posters = useMemo((): Poster[] => {
-    const genres = new Map(tonight.map((m) => [String(m.id), m.genres]))
     return data
       ? rows(data, order, reversed).movies.map((movie) => ({
           id: movie.id,
@@ -517,7 +527,7 @@ export function Standings({
           // The value it's sorted by; for rank (on the badge) and title, its genres
           detail:
             order === "rank" || order === "title"
-              ? genreLabel(genres.get(movie.id), 2) ||
+              ? genreLabel(data.data.movies[movie.id]?.genres, 2) ||
                 facts(movie, data.current).nights!
               : facts(movie, data.current)[order]!,
         }))
@@ -540,12 +550,9 @@ export function Standings({
 
   return (
     <>
-      {/* The file behind what's shown: tonight's list, or a year's */}
+      {/* Tonight's list; each night's is also kept as best-pictures-YYYYMMDD.json */}
       <div className="mt-6 flex flex-wrap items-end gap-2 px-4 sm:px-6">
-        <CopyUrl
-          label="JSON"
-          url={`${SITE.url}/best-pictures${choice === CURRENT ? "" : `-${choice}`}.json`}
-        />
+        <CopyUrl label="JSON" url={`${SITE.url}/best-pictures.json`} />
         {children}
       </div>
       {/* What to show, then how to order it, under the title */}

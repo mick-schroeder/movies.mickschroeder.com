@@ -16,10 +16,10 @@ https://movies.mickschroeder.com/best-pictures.json
 
 ## Files
 
-| File                                                                      | Contents                                                                                                                                |
-| ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| [best-pictures.json](https://movies.mickschroeder.com/best-pictures.json) | Tonight's standings: 25 movies, best first                                                                                              |
-| `best-pictures-YYYY.json`                                                 | Every night's standings for one calendar year, e.g. [best-pictures-2026.json](https://movies.mickschroeder.com/best-pictures-2026.json) |
+| File                                                                      | Contents                                                                     |
+| ------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| [best-pictures.json](https://movies.mickschroeder.com/best-pictures.json) | Tonight's standings: 25 movies, best first                                   |
+| `best-pictures-YYYYMMDD.json`                                             | One night's standings in the same format, e.g. `best-pictures-20261123.json` |
 
 `best-pictures.json` is a JSON array of:
 
@@ -33,51 +33,48 @@ https://movies.mickschroeder.com/best-pictures.json
 }
 ```
 
-`best-pictures-YYYY.json` holds the TMDB ids for each night, best first, the details of every movie that has appeared, and each eligible movie's standing score after the latest night:
+`best-pictures-YYYYMMDD.json` is each night's `best-pictures.json`, kept under its date (UTC) like Steven Lu's `movies-YYYYMMDD.json`. Both formats are the contract and won't change.
 
-```json
-{
-  "year": 2026,
-  "days": [{ "date": "2026-11-23", "ids": [3109, 550, ...] }],
-  "movies": { "3109": { "title": "The Quiet Man", "imdb_id": "tt0045061", "poster_url": "...", "release_date": "1952-07-21", "links": { "letterboxd": "https://letterboxd.com/film/the-quiet-man/" } } },
-  "scores": { "3109": 87.5 }
-}
-```
+Every night from Dec 2, 2019, until this site started ranking its own is backfilled from [Steven Lu's dated lists](https://github.com/sjlu/popular-movies#usage) (15 recent movies, his order; lists before 2023 have only IMDb ids, so TMDB ids are looked up). Nights missing from his archive (for example Oct 25, 2025–Jan 21, 2026 and Mar 11–May 24, 2026) have no file. The backfill runs once, on the first run with `--new-history`.
 
-A movie's optional `links` holds the pages MDBList knows for it: `rottentomatoes`, `metacritic`, `letterboxd` and `trakt`, each a full URL.
+### Site data
 
-Every night from Dec 2, 2019, until this site started ranking its own is backfilled from [Steven Lu's dated lists](https://github.com/sjlu/popular-movies#usage) (`movies-YYYYMMDD.json`: 15 recent movies, his order; lists before 2023 have only IMDb ids, so TMDB ids are looked up). Those days have `"source": "stevenlu"`; nights missing from his archive (for example Oct 25, 2025–Jan 21, 2026 and Mar 11–May 24, 2026) show as gaps. The backfill runs once, on the first run with `--new-history`, writing `best-pictures-2019.json` onward for every year the live site doesn't have yet.
+The site keeps its own working data under `data/`. It isn't a contract and may change; use the files above instead.
 
-Dates are UTC. The eligibility window is rolling (the last 365 days), so in January a year's file still includes movies from late the year before.
+| File                 | Contents                                                                                                               |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `data/rankings.json` | Every night's TMDB ids, best first, oldest night first; Steven Lu's nights have `"source": "stevenlu"`                 |
+| `data/movies.json`   | Every movie that has been in the standings, by TMDB id: title, IMDb id, poster, release date, genres, runtime, trailer |
+| `data/scores.json`   | Each eligible movie's standing score after the latest night, which tomorrow's ranking starts from                      |
 
 ## How it works
 
 The repo is one Astro + shadcn site with the data pipeline as a build step:
 
 ```
-pipeline/   nightly data: TMDB + MDBList + AI scoring -> public/best-pictures.json, public/best-pictures-YYYY.json
+pipeline/   nightly data: TMDB + MDBList + AI scoring -> public/best-pictures*.json, public/data/
 src/        the site (Astro pages, React islands, shadcn components)
 public/     static files copied as-is (llms.txt, robots.txt, and tonight's data once built)
 infra/      AWS stack: S3 + CloudFront + GitHub OIDC role
 ```
 
 1. `pnpm build:data` ([`pipeline/build.ts`](pipeline/build.ts)) does the work:
-   - History - Downloads this year's and last year's `best-pictures-YYYY.json` from the live site.
+   - History - Downloads `data/` (rankings, movie details, scores) from the live site.
    - Gather - Gets movies from TMDB first released in the last 365 days (re-releases of older movies are left out).
    - Enrich - Adds ratings from MDBList.
    - Score - The AI scores every movie with at least 500 TMDB votes from 0 to 100.
    - Rank - Each movie's standing score becomes 25% tonight's score and 75% last night's
      standing (`SMOOTHING` in `pipeline/config.ts`); a new movie starts at its first score. The top 25
      are tonight's standings.
-   - Write - Checks `best-pictures.json` and the history, then writes them to `public/`.
+   - Write - Checks everything, then writes `best-pictures.json`, tonight's `best-pictures-YYYYMMDD.json` and `data/` to `public/`.
 2. `pnpm build` builds the site into `dist/`: the year's chart, tonight's 25, and a page for
-   every movie that has been in the standings (`/title/{tmdb_id}-{title}/`) with its ridge, stats and
-   links to TMDB, IMDb, Letterboxd, MDBList, Rotten Tomatoes, Metacritic and Trakt.
+   every movie that has been in the standings (`/title/{tmdb_id}-{title}/`): its year as a short joyplot of the movies that joined around it, its own ridge in bold
+   and its release, first, best and latest nights pinned on it, plus links to TMDB, IMDb, Letterboxd, MDBList, Rotten Tomatoes, Metacritic and Trakt.
    Without `public/best-pictures.json` (local dev, CI) it uses the live file instead.
 3. The `publish` GitHub Actions workflow runs both nightly, uploads `dist/` to S3
    and refreshes CloudFront. If any check fails, nothing is uploaded and the
-   previous day's files stay live. If this year's history can't be downloaded the
-   build fails rather than start over, except on Jan 1. For the very first run, start the
+   previous day's files stay live. If `data/` can't be downloaded the
+   build fails rather than start over. For the very first run, start the
    workflow by hand with **new_history** checked (locally: `pnpm build:data --new-history`).
 4. The ranking instructions are in [`pipeline/prompts/rank-movies.md`](pipeline/prompts/rank-movies.md).
 

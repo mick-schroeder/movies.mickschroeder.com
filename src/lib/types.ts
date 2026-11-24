@@ -1,6 +1,15 @@
-// The published file formats, shared by the nightly pipeline and the site.
+// The published files, shared by the nightly pipeline and the site.
+//
+// Public contract, Steven Lu's popular-movies format (an array of ListMovie):
+//   best-pictures.json            tonight's standings
+//   best-pictures-YYYYMMDD.json   each night's standings, like his movies-YYYYMMDD.json
+//
+// The site's own working data, not a contract (free to change):
+//   data/rankings.json   every night's tmdb ids, best first (RankDay[])
+//   data/movies.json     details of every movie that has been in the standings (Catalog)
+//   data/scores.json     the latest standing scores the pipeline smooths from (Scores)
 
-/** One movie in best-pictures.json (the v1 format, same as the StevenLu popular-movies lists). */
+/** One movie in best-pictures.json and best-pictures-YYYYMMDD.json. Don't change it. */
 export interface ListMovie {
   title: string
   tmdb_id: number
@@ -9,7 +18,7 @@ export interface ListMovie {
   genres: string[]
 }
 
-/** One night's standings in best-pictures-YYYY.json: tmdb ids, best first. */
+/** One night's standings in data/rankings.json: tmdb ids, best first. */
 export interface RankDay {
   date: string // YYYY-MM-DD
   ids: number[]
@@ -17,27 +26,28 @@ export interface RankDay {
   source?: "stevenlu"
 }
 
-/** Pages about a movie on other sites, where known (from MDBList). */
+/** Pages about a movie that can't be built from its ids (from MDBList). */
 export interface MovieLinks {
   rottentomatoes?: string
   metacritic?: string
-  letterboxd?: string
-  trakt?: string
 }
 
-/** What best-pictures-YYYY.json keeps about each movie that has been in the standings. */
-export interface HistoryMovie {
+/** One movie in data/movies.json. */
+export interface CatalogMovie {
   title: string
   imdb_id: string
   poster_url: string | null
   release_date: string | null
+  genres: string[]
+  /** In minutes. */
+  runtime: number | null
+  /** A YouTube trailer. */
+  trailer_url: string | null
   links?: MovieLinks
 }
 
-/** best-pictures-YYYY.json: every night's standings for a calendar year. */
-export interface RankHistory {
-  year: number
-  days: RankDay[] // oldest first
-  movies: Record<string, HistoryMovie>
-  scores: Record<string, number> // standing score after the latest night
-}
+/** data/movies.json, by tmdb id. */
+export type Catalog = Record<string, CatalogMovie>
+
+/** data/scores.json: { [tmdb_id]: standing score } after the latest night. */
+export type Scores = Record<string, number>

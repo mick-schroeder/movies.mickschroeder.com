@@ -1,6 +1,8 @@
 // A movie as it moves through the pipeline: TMDB discover fields, then details, then ratings.
 import type { MovieLinks } from "../../src/lib/types.ts"
 
+export type { Scores } from "../../src/lib/types.ts"
+
 export interface Movie {
   id: number
   title: string
@@ -13,6 +15,8 @@ export interface Movie {
   imdb_id?: string | null
   revenue?: number | null
   genres?: string[]
+  runtime?: number | null
+  trailer_url?: string | null
   imdb_rating?: number | null
   imdb_votes?: number | null
   rt_score?: number | null
@@ -23,6 +27,3 @@ export interface Movie {
   mdblist_score?: number | null
   links?: MovieLinks
 }
-
-/** { [id]: score } */
-export type Scores = Record<string, number>

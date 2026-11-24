@@ -5,7 +5,7 @@ import BaseHead, {
 import SiteFooter from "@/components/site/site-footer.astro"
 import SiteHeader from "@/components/site/site-header.astro"
 import BrandIcon from "@/components/brand-icon.astro"
-import { siGithub, siMdblist, siThemoviedatabase } from "simple-icons"
+import { siMdblist, siThemoviedatabase } from "simple-icons"
 import { SITE } from "@/consts"
 import { ClientRouter } from "astro:transitions"
 import "@/styles/global.css"
@@ -30,19 +30,6 @@ const { hideTitle = false, ...head } = Astro.props
     <div class="px-4 sm:px-6">
       <SiteFooter code={SITE.code}>
         <div class="flex flex-col gap-2">
-          <p class="flex items-center gap-2">
-            <BrandIcon icon={siGithub} />
-            <span>
-              Based on{" "}
-              <a
-                href="https://github.com/sjlu/popular-movies"
-                class="underline hover:text-foreground"
-              >
-                popular-movies
-              </a>{" "}
-              by Steven Lu.
-            </span>
-          </p>
           <p class="flex items-center gap-2">
             <BrandIcon icon={siMdblist} />
             <span>

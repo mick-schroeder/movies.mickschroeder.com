@@ -1,11 +1,10 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
-import * as history from "../pipeline/lib/history.ts"
+import * as data from "../pipeline/lib/data.ts"
 import type { Movie } from "../pipeline/lib/types.ts"
 import validateList from "../pipeline/lib/validate.ts"
 import config from "../pipeline/config.ts"
 import { pickTop, standingScores } from "../pipeline/rank.ts"
-import type { RankHistory } from "../src/lib/types.ts"
 
 const range = (from: number, to: number, step = 1) =>
   Array.from(
@@ -13,7 +12,7 @@ const range = (from: number, to: number, step = 1) =>
     (_, i) => from + i * step
   )
 
-describe("history", () => {
+describe("data", () => {
   const movie = (id: number): Movie => ({
     id,
     tmdb_id: id,
@@ -21,61 +20,81 @@ describe("history", () => {
     imdb_id: `tt${id}`,
     poster_url: null,
     release_date: "2026-01-01",
+    genres: ["drama"],
+    runtime: 120,
+    trailer_url: null,
   })
-  const day = (date: string, ids: number[]) => ({ date, ids })
+  const night = (date: string, ids: number[]) => ({ date, ids })
+  const empty: data.Data = { rankings: [], catalog: {}, scores: {} }
 
-  it("adds a day and keeps movie details", () => {
-    let h = history.addDay(
-      history.empty(2026),
-      "2026-11-22",
-      [movie(1), movie(2)],
-      { 1: 80, 2: 70 }
-    )
-    h = history.addDay(h, "2026-11-23", [movie(2), movie(3)], { 2: 75, 3: 60 })
-
-    assert.deepEqual(h.days, [
-      day("2026-11-22", [1, 2]),
-      day("2026-11-23", [2, 3]),
-    ])
-    assert.deepEqual(Object.keys(h.movies), ["1", "2", "3"])
-    assert.deepEqual(h.scores, { 2: 75, 3: 60 })
-    history.validate(h)
-  })
-
-  it("replaces the day on a rerun", () => {
-    let h = history.addDay(history.empty(2026), "2026-11-23", [movie(1)], {})
-    h = history.addDay(h, "2026-11-23", [movie(2)], {})
-    assert.deepEqual(h.days, [day("2026-11-23", [2])])
-  })
-
-  it("rejects a bad history", () => {
-    const movies = {
-      1: { title: "A", imdb_id: "tt1", poster_url: null, release_date: null },
-    }
-    const bad = (h: Partial<RankHistory>) => ({
-      year: 2026,
-      days: [],
-      movies: {},
-      scores: {},
-      ...h,
+  it("adds a night and keeps movie details", () => {
+    let d = data.addNight(empty, "2026-11-22", [movie(1), movie(2)], {
+      1: 80,
+      2: 70,
     })
+    d = data.addNight(d, "2026-11-23", [movie(2), movie(3)], { 2: 75, 3: 60 })
+
+    assert.deepEqual(d.rankings, [
+      night("2026-11-22", [1, 2]),
+      night("2026-11-23", [2, 3]),
+    ])
+    assert.deepEqual(Object.keys(d.catalog), ["1", "2", "3"])
+    assert.deepEqual(d.scores, { 2: 75, 3: 60 })
+    data.validate(d)
+  })
+
+  it("replaces the night on a rerun", () => {
+    let d = data.addNight(empty, "2026-11-23", [movie(1)], {})
+    d = data.addNight(d, "2026-11-23", [movie(2)], {})
+    assert.deepEqual(d.rankings, [night("2026-11-23", [2])])
+  })
+
+  it("lists a night in Steven Lu's format", () => {
+    const d = data.addNight(empty, "2026-11-23", [movie(2), movie(1)], {})
+    const list = data.toList(d.rankings[0]!.ids, d.catalog)
+    validateList("best-pictures-20261123.json", list, { requireImdbId: true })
+    assert.deepEqual(list[0], {
+      title: "Movie 2",
+      tmdb_id: 2,
+      imdb_id: "tt2",
+      poster_url: null,
+      genres: ["drama"],
+    })
+    assert.equal(
+      data.datedFilename("2026-11-23"),
+      "best-pictures-20261123.json"
+    )
+  })
+
+  it("rejects bad data", () => {
+    const catalog = {
+      1: {
+        title: "A",
+        imdb_id: "tt1",
+        poster_url: null,
+        release_date: null,
+        genres: [],
+        runtime: null,
+        trailer_url: null,
+      },
+    }
+    const bad = (d: Partial<data.Data>) => ({ ...empty, ...d })
     assert.throws(
       () =>
-        history.validate(
+        data.validate(
           bad({
-            days: [day("2026-03-02", [1]), day("2026-03-01", [1, 1])],
-            movies,
+            rankings: [night("2026-03-02", [1]), night("2026-03-01", [1, 1])],
+            catalog,
           })
         ),
       /out of order/
     )
     assert.throws(
-      () => history.validate(bad({ days: [day("2026-03-01", [7])] })),
+      () => data.validate(bad({ rankings: [night("2026-03-01", [7])] })),
       /no movie details/
     )
     assert.throws(
-      () =>
-        history.validate(bad({ scores: { 1: "high" as unknown as number } })),
+      () => data.validate(bad({ scores: { 1: "high" as unknown as number } })),
       /scores/
     )
   })

@@ -2,8 +2,9 @@
 // public/; without them (local dev, CI) uses the live site's files instead.
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
-import { FIRST_YEAR, SITE } from "@/consts"
-import type { HistoryMovie, ListMovie, RankHistory } from "@/lib/types"
+import { SITE } from "@/consts"
+import { type Ridge, ridges, yearOf, yearSpan } from "@/lib/ridgeline"
+import type { Catalog, CatalogMovie, ListMovie, RankDay } from "@/lib/types"
 
 /** A published file, or null if neither public/ nor the live site has it. */
 async function load<T>(name: string): Promise<T | null> {
@@ -29,46 +30,71 @@ export function getStandings(): Promise<ListMovie[]> {
   return standings
 }
 
-let histories: Promise<RankHistory[]> | undefined
-/** Every year's rank history that exists, oldest first. */
-export function getHistories(): Promise<RankHistory[]> {
-  const thisYear = new Date().getUTCFullYear()
-  const years = Array.from(
-    { length: thisYear - FIRST_YEAR + 1 },
-    (_, i) => FIRST_YEAR + i
-  )
-  histories ??= Promise.all(
-    years.map((year) => load<RankHistory>(`best-pictures-${year}.json`))
-  ).then((all) => all.filter((h): h is RankHistory => !!h?.days.length))
-  return histories
+let history: Promise<{ rankings: RankDay[]; catalog: Catalog }> | undefined
+/** Every night's standings, oldest first, and the movies in them (empty before the first history). */
+export function getHistory() {
+  history ??= Promise.all([
+    load<RankDay[]>("data/rankings.json"),
+    load<Catalog>("data/movies.json"),
+  ]).then(([rankings, catalog]) => ({
+    rankings: rankings ?? [],
+    catalog: catalog ?? {},
+  }))
+  return history
 }
 
-export interface MovieSummary extends HistoryMovie {
+const years = new Map<number, Promise<YearRidges>>()
+export interface YearRidges {
+  start: number
+  end: number
+  /** Every movie ranked that year, in the order they joined. */
+  ridges: Ridge[]
+}
+/** A year's ridges, worked out once for every movie page that shows the year. */
+export function getYear(year: number): Promise<YearRidges> {
+  if (!years.has(year)) {
+    years.set(
+      year,
+      getHistory().then(({ rankings, catalog }) => {
+        const data = yearOf(rankings, catalog, year)
+        const { start, end } = yearSpan(data)
+        return { start, end, ridges: ridges(data, start, end) }
+      })
+    )
+  }
+  return years.get(year)!
+}
+
+export interface MovieSummary extends CatalogMovie {
   id: number
-  genres: string[]
   /** Tonight's rank, or null if it isn't in tonight's standings. */
   tonight: number | null
   best: number | null
+  /** The first night it reached its best rank. */
+  bestNight: string | null
   nights: number
   firstNight: string | null
   lastNight: string | null
   /** The years it was in the standings. */
-  years: RankHistory[]
+  years: number[]
 }
 
 /** Every movie that has been in the standings, or is tonight. */
 export async function getMovies(): Promise<MovieSummary[]> {
-  const [list, years] = await Promise.all([getStandings(), getHistories()])
+  const [list, { rankings, catalog }] = await Promise.all([
+    getStandings(),
+    getHistory(),
+  ])
   const movies = new Map<number, MovieSummary>()
-  const get = (id: number, info: HistoryMovie) => {
+  const get = (id: number, info: CatalogMovie) => {
     let movie = movies.get(id)
     if (!movie) {
       movie = {
         id,
         ...info,
-        genres: [],
         tonight: null,
         best: null,
+        bestNight: null,
         nights: 0,
         firstNight: null,
         lastNight: null,
@@ -79,30 +105,30 @@ export async function getMovies(): Promise<MovieSummary[]> {
     return movie
   }
 
-  for (const history of years) {
-    for (const day of history.days) {
-      day.ids.forEach((id, i) => {
-        const movie = get(id, history.movies[id]!)
-        // Later years have the latest details
-        Object.assign(movie, history.movies[id])
-        if (movie.years.at(-1) !== history) movie.years.push(history)
-        movie.best = Math.min(movie.best ?? Infinity, i + 1)
-        movie.nights++
-        movie.firstNight ??= day.date
-        movie.lastNight = day.date
-      })
-    }
+  for (const night of rankings) {
+    const year = Number(night.date.slice(0, 4))
+    night.ids.forEach((id, i) => {
+      const movie = get(id, catalog[id]!)
+      if (movie.years.at(-1) !== year) movie.years.push(year)
+      if (i + 1 < (movie.best ?? Infinity)) {
+        movie.best = i + 1
+        movie.bestNight = night.date
+      }
+      movie.nights++
+      movie.firstNight ??= night.date
+      movie.lastNight = night.date
+    })
   }
 
   list.forEach((item, i) => {
     const movie = get(item.tmdb_id, {
-      title: item.title,
-      imdb_id: item.imdb_id,
-      poster_url: item.poster_url,
+      ...item,
       release_date: null,
+      runtime: null,
+      trailer_url: null,
+      ...catalog[item.tmdb_id],
     })
     movie.tonight = i + 1
-    movie.genres = item.genres
   })
 
   return [...movies.values()]

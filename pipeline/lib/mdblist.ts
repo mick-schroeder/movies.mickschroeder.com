@@ -23,22 +23,19 @@ interface Rating {
 }
 
 interface MdblistMovie {
-  ids: { tmdb: number; trakt?: number | null }
+  ids: { tmdb: number }
   score?: number
   ratings?: Rating[]
 }
 
-// MDBList gives each site's path for the movie; turn them into full URLs
+// MDBList gives each site's path for the movie; turn them into full URLs.
+// Only for sites with no page by IMDb or TMDB id (see src/lib/links.ts).
 const SITES = {
   rottentomatoes: ["tomatoes", "https://www.rottentomatoes.com"],
   metacritic: ["metacritic", "https://www.metacritic.com/movie"],
-  letterboxd: ["letterboxd", "https://letterboxd.com"],
 } as const
 
-function links(
-  movie: MdblistMovie,
-  rating: (source: string) => Partial<Rating>
-): MovieLinks {
+function links(rating: (source: string) => Partial<Rating>): MovieLinks {
   const result: MovieLinks = {}
   for (const [site, [source, base]] of Object.entries(SITES)) {
     const path = rating(source).url
@@ -46,8 +43,6 @@ function links(
       result[site as keyof typeof SITES] = base + path
     }
   }
-  if (movie.ids.trakt)
-    result.trakt = `https://trakt.tv/movies/${movie.ids.trakt}`
   return result
 }
 
@@ -86,7 +81,7 @@ export default async function getRatings(
         letterboxd_rating: rating("letterboxd").value ?? null,
         letterboxd_votes: rating("letterboxd").votes ?? null,
         mdblist_score: movie.score ?? null,
-        links: links(movie, rating),
+        links: links(rating),
       }
     }
   }

@@ -1,3 +1,10 @@
+## 2026-11-24
+
+* Each night's standings are also published as `best-pictures-YYYYMMDD.json`, in the same format as `best-pictures.json`, like Steven Lu's dated `movies-YYYYMMDD.json`. Files go back to Dec 2, 2019 (his lists before this site ranked its own).
+* Removed `best-pictures-YYYY.json`. Its rankings, movie details and standing scores are now the site's own working data in `data/rankings.json`, `data/movies.json` and `data/scores.json`, which aren't a public contract.
+* Every ranked movie's details now include its genres, runtime and YouTube trailer (from TMDB). Letterboxd and Trakt links are built from the TMDB id instead of stored.
+* Movie pages are redesigned around a joyplot of the movie's year: the movies that joined the standings just before and after it stacked, this one in bold on top, with its release date, first ranked, best rank and tonight (or last ranked) pinned on its ridge. They also show the runtime, the links as a plain list with a Trailer link, and the movies ranked just above and below it tonight.
+
 ## 2026-11-23
 
 * The site is now built with Astro and shadcn/ui (Luma style, black and white with small emerald accents). Tonight's standings are rendered into the page instead of loaded by script, and the standings chart and copy button are small React islands.
