@@ -1,35 +1,48 @@
 ---
-// The home page (chart) and /tonight/ (posters): the same hero and the same
-// Standings island, kept across the navigation so its filters stay put.
-import type { Props as HeadProps } from "@/components/site/base-head.astro"
+// A standings page: the current standings (/) or one year's (/year/2024/).
+// The same hero, the list as chart or posters, and the list as structured data.
 import BrandIcon from "@/components/brand-icon.astro"
-import { Standings, type ViewName } from "@/components/standings"
+import {
+  type Choice,
+  type ListedMovie,
+  Standings,
+} from "@/components/standings"
 import { buttonVariants } from "@/components/ui/button"
-import { FIRST_YEAR, SITE } from "@/consts"
+import { SITE } from "@/consts"
 import Layout from "@/layouts/base.astro"
-import { moviePath } from "@/lib/links"
-import { getMovies, getStandings } from "@/lib/movies"
+import { getYears } from "@/lib/movies"
 import { siGithub } from "simple-icons"
 
-type Props = HeadProps & { view: ViewName }
-const { view, ...head } = Astro.props
+interface Props {
+  title: string
+  description: string
+  choice: Choice
+  /** The page's movies, best first. */
+  listed: ListedMovie[]
+  /** The list's name, for structured data. */
+  listName: string
+}
+const { title, description, choice, listed, listName } = Astro.props
 
-const thisYear = new Date().getUTCFullYear()
-const years = Array.from(
-  { length: thisYear - FIRST_YEAR + 1 },
-  (_, i) => thisYear - i
-)
-const pages = new Map((await getMovies()).map((m) => [m.id, moviePath(m)]))
-const tonight = (await getStandings()).map((movie) => ({
-  id: movie.tmdb_id,
-  title: movie.title,
-  poster_url: movie.poster_url,
-  genres: movie.genres,
-  href: pages.get(movie.tmdb_id)!,
-}))
+const years = getYears()
+
+const jsonLd = [
+  {
+    "@type": "ItemList",
+    name: listName,
+    itemListOrder: "https://schema.org/ItemListOrderAscending",
+    numberOfItems: listed.length,
+    itemListElement: listed.map((movie, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      url: new URL(movie.href, SITE.url).href,
+      name: movie.title,
+    })),
+  },
+]
 ---
 
-<Layout {...head} hideTitle>
+<Layout {title} {description} {jsonLd} hideTitle>
   <section class="relative overflow-hidden pb-6">
     <div class="px-4 pt-8 sm:px-6 sm:pt-12">
       <h1 class="font-heading text-[clamp(3.25rem,13vw,11rem)] leading-[0.82] font-extrabold tracking-[-0.055em]">
@@ -37,18 +50,13 @@ const tonight = (await getStandings()).map((movie) => ({
           Mick Schroeder’s
         </span>{" "}
         {SITE.title}
+        {choice !== "current" && <span class="block"> {choice}</span>}
       </h1>
       <p class="mt-4 text-xl font-medium text-balance text-muted-foreground sm:text-2xl">
-        {SITE.description}
+        {description}
       </p>
     </div>
-    <Standings
-      client:load
-      transition:persist="standings"
-      years={years}
-      view={view}
-      tonight={tonight}
-    >
+    <Standings client:load years={years} choice={choice} listed={listed}>
       <a href={SITE.code} class={buttonVariants({ variant: "outline" })}>
         <BrandIcon icon={siGithub} />
         GitHub

@@ -19,6 +19,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Empty, EmptyDescription } from "@/components/ui/empty"
@@ -87,8 +88,8 @@ const ORDERS = {
     compare: (a: Ridge, b: Ridge) => a.rank - b.rank,
   },
   joined: {
-    label: "When they joined",
-    compare: (a: Ridge, b: Ridge) => a.row - b.row,
+    label: "Recently added",
+    compare: (a: Ridge, b: Ridge) => b.row - a.row,
   },
   release: {
     label: "Release date",
@@ -99,10 +100,6 @@ const ORDERS = {
     label: "Best rank",
     compare: (a: Ridge, b: Ridge) => a.best - b.best || b.nights - a.nights,
   },
-  nights: {
-    label: "Most nights ranked",
-    compare: (a: Ridge, b: Ridge) => b.nights - a.nights || a.best - b.best,
-  },
   title: {
     label: "Title A–Z",
     compare: (a: Ridge, b: Ridge) => a.title.localeCompare(b.title),
@@ -110,22 +107,19 @@ const ORDERS = {
 }
 type Order = keyof typeof ORDERS
 
-// What's known about a movie, one line per sort order (Title A–Z needs none: the
-// title is always shown). A poster shows the one it's sorted by.
-function facts(d: Ridge, current: boolean): Record<Order, string | null> {
+// What a poster's corner shows: the value it's sorted by, kept short. A title
+// sort needs none (the title is always shown).
+function badge(d: Ridge, order: Order): string | null {
   return {
-    rank: current ? `Rank ${d.rank} tonight` : `Rank ${d.rank} for the year`,
-    joined: `Joined ${formatDate(d.joined)}`,
-    release: d.release_date
-      ? `Released ${formatDate(d.release_date)}`
-      : "Release date unknown",
-    best: `Best rank ${d.best}`,
-    nights: `${d.nights} night${d.nights === 1 ? "" : "s"} ranked`,
+    rank: String(d.rank),
+    joined: formatDate(d.joined),
+    release: d.release_date && formatDate(d.release_date),
+    best: `Best #${d.best}`,
     title: null,
-  }
+  }[order]
 }
 
-// What the chart shows: one calendar year, or tonight's movies over the last 365 days
+// What the chart shows: one calendar year, or the current movies over the last 365 days
 interface View {
   data: ChartData
   current: boolean
@@ -139,7 +133,7 @@ function rows({ data, current }: View, order: Order, reversed = false) {
     : yearSpan(data)
   const movies = ridges(data, start, end)
     .filter((movie) => !current || movie.last !== null)
-    // The current view ranks by tonight's list; a year by its points
+    // The current view ranks by the latest night's list; a year by its points
     .map((movie) => (current ? { ...movie, rank: movie.last! } : movie))
     .sort((a, b) => (reversed ? -1 : 1) * ORDERS[order].compare(a, b))
     .map((movie, row) => ({ ...movie, row }))
@@ -207,8 +201,8 @@ function draw(
     .attr(
       "aria-label",
       current
-        ? "How high tonight’s movies ranked over the last year"
-        : `How high each movie ranked across ${data.year}`
+        ? "The best movies of the past year, over time"
+        : `The best movies of ${data.year}, over time`
     )
 
   const monthWidth =
@@ -319,10 +313,14 @@ const loadHistory = () =>
   ]))
 
 const CURRENT = "current"
-type Choice = typeof CURRENT | `${number}`
+/** What a page shows: the current standings or one calendar year. */
+export type Choice = typeof CURRENT | `${number}`
+/** Each choice's page: / for the current standings, /year/2024/ for a year. */
+export const choicePath = (choice: Choice) =>
+  choice === CURRENT ? "/" : `/year/${choice}/`
 
-/** One of tonight's movies, from best-pictures.json (rendered on the server, before the history loads). */
-export interface TonightMovie {
+/** One of the page's movies, best first (rendered on the server, before the history loads). */
+export interface ListedMovie {
   id: number
   title: string
   poster_url: string | null
@@ -335,9 +333,9 @@ interface Poster {
   title: string
   poster_url: string | null
   href: string
-  /** Tonight's rank, or the year's; shown large. */
-  rank: number
-  detail: string
+  /** In the corner: what it's sorted by, or nothing. */
+  badge: string | null
+  genres: string
 }
 
 // The hovered movie's poster and what's known about it
@@ -351,12 +349,9 @@ function RidgeTip({
   poster: string | null | undefined
 }) {
   const stats: [string, string | number][] = [
-    current && d.last !== null
-      ? ["Tonight", `#${d.last}`]
-      : ["Year", `#${d.rank}`],
+    current && d.last !== null ? ["Now", `#${d.last}`] : ["Year", `#${d.rank}`],
     ["Best", `#${d.best}`],
-    ["Nights ranked", d.nights],
-    ["Joined", formatDate(d.joined)],
+    ["Added", formatDate(d.joined)],
     ["Released", d.release_date ? formatDate(d.release_date) : "Unknown"],
   ]
   return (
@@ -398,9 +393,11 @@ function Posters({ movies }: { movies: Poster[] }) {
             className="group flex flex-col gap-3 rounded-sm focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
           >
             <div className="relative aspect-2/3 overflow-hidden rounded-sm bg-muted">
-              <Badge className="absolute top-2 left-2 font-bold tabular-nums">
-                {movie.rank}
-              </Badge>
+              {movie.badge && (
+                <Badge className="absolute top-2 left-2 font-bold tabular-nums">
+                  {movie.badge}
+                </Badge>
+              )}
               {movie.poster_url && (
                 <img
                   src={movie.poster_url}
@@ -418,7 +415,7 @@ function Posters({ movies }: { movies: Poster[] }) {
                 {movie.title}
               </div>
               <div className="text-sm text-muted-foreground">
-                {movie.detail}
+                {movie.genres}
               </div>
             </div>
           </a>
@@ -428,29 +425,41 @@ function Posters({ movies }: { movies: Poster[] }) {
   )
 }
 
-// Chart and posters are two pages (/ and /tonight/) sharing this island, which
-// Astro keeps across the navigation (transition:persist), so the filters stay put.
+// Two ways to see the same list, on the same page; the visitor's pick is remembered
 const VIEWS = [
-  { value: "chart", label: "Chart", href: "/", Icon: ChartArea },
-  { value: "posters", label: "Posters", href: "/tonight/", Icon: LayoutGrid },
+  { value: "chart", label: "Chart", Icon: ChartArea },
+  { value: "posters", label: "Posters", Icon: LayoutGrid },
 ] as const
-export type ViewName = (typeof VIEWS)[number]["value"]
+type ViewName = (typeof VIEWS)[number]["value"]
+const VIEW_KEY = "standings-view"
+const noSubscribe = () => () => {}
+function storedView(): ViewName {
+  try {
+    return localStorage.getItem(VIEW_KEY) === "posters" ? "posters" : "chart"
+  } catch {
+    return "chart" // Storage blocked
+  }
+}
 
 export function Standings({
   years,
-  view,
-  tonight,
+  choice,
+  listed,
   children,
 }: {
   years: number[]
-  view: ViewName
-  tonight: TonightMovie[]
+  /** The page's list; picking another goes to its page. */
+  choice: Choice
+  listed: ListedMovie[]
   /** Shown beside the JSON field (the hero's links). */
   children?: ReactNode
 }) {
-  const [choice, setChoice] = useState<Choice>(CURRENT)
+  // The server renders the chart; the browser then shows the visitor's last pick
+  const stored = useSyncExternalStore(noSubscribe, storedView, () => "chart")
+  const [picked, setPicked] = useState<ViewName | null>(null)
+  const view = picked ?? stored
   const [order, setOrder] = useState<Order>("rank")
-  // Each order has a natural direction (best first, newest last, A to Z); this flips it
+  // Each order has a natural direction (best first, latest added first, A to Z); this flips it
   const [reversed, setReversed] = useState(false)
   const [data, setData] = useState<View | null | undefined>(undefined)
   const [swept, setSwept] = useState(false)
@@ -462,6 +471,15 @@ export function Standings({
   const poster =
     hover &&
     data?.data.movies[hover.id]?.poster_url?.replace("/w500/", "/w185/")
+
+  const chooseView = (next: ViewName) => {
+    setPicked(next)
+    try {
+      localStorage.setItem(VIEW_KEY, next)
+    } catch {
+      // Storage blocked: the pick lasts for this page only
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -478,12 +496,6 @@ export function Standings({
       cancelled = true
     }
   }, [choice])
-
-  const choose = (value: Choice) => {
-    setChoice(value)
-    setOrder("rank")
-    setReversed(false)
-  }
 
   // Draw at the page's width, and redraw when that changes
   useEffect(() => {
@@ -514,7 +526,7 @@ export function Standings({
     }
   }, [data, order, reversed, view])
 
-  // Before the history loads (and on the server), posters are tonight's 25.
+  // Before the history loads (and on the server), posters are the page's list.
   // Kept between hovers, which re-render this.
   const posters = useMemo((): Poster[] => {
     return data
@@ -523,21 +535,16 @@ export function Standings({
           title: movie.title,
           poster_url: data.data.movies[movie.id]?.poster_url ?? null,
           href: moviePath(movie),
-          rank: movie.rank,
-          // The value it's sorted by; for rank (on the badge) and title, its genres
-          detail:
-            order === "rank" || order === "title"
-              ? genreLabel(data.data.movies[movie.id]?.genres, 2) ||
-                facts(movie, data.current).nights!
-              : facts(movie, data.current)[order]!,
+          badge: badge(movie, order),
+          genres: genreLabel(data.data.movies[movie.id]?.genres, 2),
         }))
-      : tonight.map((movie, i) => ({
+      : listed.map((movie, i) => ({
           ...movie,
           id: String(movie.id),
-          rank: i + 1,
-          detail: genreLabel(movie.genres, 2),
+          badge: String(i + 1),
+          genres: genreLabel(movie.genres, 2),
         }))
-  }, [data, order, reversed, tonight])
+  }, [data, order, reversed, listed])
 
   const items: { value: Choice; label: string }[] = [
     { value: CURRENT, label: "Current" },
@@ -550,7 +557,7 @@ export function Standings({
 
   return (
     <>
-      {/* Tonight's list; each night's is also kept as best-pictures-YYYYMMDD.json */}
+      {/* The current list; each night's is also kept as best-pictures-YYYYMMDD.json */}
       <div className="mt-6 flex flex-wrap items-end gap-2 px-4 sm:px-6">
         <CopyUrl label="JSON" url={`${SITE.url}/best-pictures.json`} />
         {children}
@@ -560,7 +567,9 @@ export function Standings({
         <Select
           items={items}
           value={choice}
-          onValueChange={(value) => value && choose(value)}
+          onValueChange={(value) =>
+            value && value !== choice && navigate(choicePath(value))
+          }
         >
           <SelectTrigger aria-label="Show">
             <SelectValue />
@@ -609,8 +618,7 @@ export function Standings({
           className="ml-auto"
           value={[view]}
           onValueChange={([next]) => {
-            const item = VIEWS.find((v) => v.value === next)
-            if (item && item.value !== view) navigate(item.href)
+            if (next) chooseView(next as ViewName)
           }}
         >
           {VIEWS.map(({ value, label, Icon }) => (

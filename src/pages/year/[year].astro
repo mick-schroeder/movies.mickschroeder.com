@@ -1,0 +1,21 @@
+---
+// One calendar year's standings, a permanent page per year
+import { SITE } from "@/consts"
+import Standings from "@/layouts/standings.astro"
+import { getYearList, getYears } from "@/lib/movies"
+
+export function getStaticPaths() {
+  return getYears().map((year) => ({ params: { year: String(year) } }))
+}
+
+const { year } = Astro.params as { year: `${number}` }
+const listed = await getYearList(Number(year))
+---
+
+<Standings
+  title={`Best movies of ${year} · ${SITE.title}`}
+  description={`The best movies of ${year}, ranked by our AI editor.`}
+  choice={year}
+  listed={listed}
+  listName={`The best movies of ${year}`}
+/>

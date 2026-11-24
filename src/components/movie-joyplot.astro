@@ -1,10 +1,10 @@
 ---
-// A movie's year as a joyplot: the movies that joined the standings just before and
-// after it, stacked in the order they joined, this one inked bold and drawn on top,
-// with its key nights pinned to its ridge. Full page width; rendered at build time.
+// A movie's year as a joyplot: its ridge inked bold among a few made-up low ridges,
+// there only for the look (later rows in front, its own on top), with its key nights pinned to it.
+// Full page width; rendered at build time.
 import * as d3 from "d3"
 import { getYear, type MovieSummary } from "@/lib/movies"
-import { DAY, formatDate, utc, wobble } from "@/lib/ridgeline"
+import { DAY, utc, wobble } from "@/lib/ridgeline"
 
 interface Props {
   movie: MovieSummary
@@ -13,12 +13,12 @@ interface Props {
 
 const { movie, year } = Astro.props
 const { start, end, ridges } = await getYear(year)
-
-// A few rows either side of this one, for context
-const CONTEXT = 4
 const id = String(movie.id)
-const row = ridges.findIndex((r) => r.id === id)
-const shown = ridges.slice(Math.max(0, row - CONTEXT), row + CONTEXT + 1)
+const ridge = ridges.find((r) => r.id === id)!
+
+// Made-up rows behind and in front of it
+const CONTEXT = 4
+const ROWS = CONTEXT * 2 + 1
 
 // A fixed drawing box stretched to the page; lines keep their thickness
 const W = 1000
@@ -26,45 +26,68 @@ const GAP = 14
 const PEAK = 56
 const BOLD = 1.3
 const TOP = PEAK * BOLD + 12
-const H = TOP + (shown.length - 1) * GAP + 6
+const H = TOP + (ROWS - 1) * GAP + 6
 const x = d3.scaleUtc([start, end], [0, W])
 const line = d3.line().curve(d3.curveBasis)
 
-let mine: [number, number][] = []
-const rows = shown.map((ridge, i) => {
-  const on = ridge.id === id
-  const base = TOP + i * GAP
-  const shake = wobble(ridge.id)
-  const amp = on ? PEAK * BOLD : PEAK
-  const shape = ridge.points.map(([t, h]): [number, number] => {
-    const px = x(t)
-    return [px, base - h * amp + shake(px)]
-  })
-  if (on) mine = shape
-  const area = `${line(shape)}L${W},${base + 3}L0,${base + 3}Z`
-  return { on, area, ink: line(shape)! }
-})
-// Drawn last, so no row covers it
-rows.push(...rows.splice(row - Math.max(0, row - CONTEXT), 1))
+// A gentle low ridge, the same for this movie on every build: a couple of slow
+// swells, never more than a fifth of a real peak
+function madeUp(seed: string): [number, number][] {
+  const random = d3.randomLcg(d3.sum(seed, (c) => c.charCodeAt(0)) / 997)
+  const swells = Array.from({ length: 2 }, () => ({
+    at: random() * W,
+    width: 40 + random() * 120,
+    height: 0.05 + random() * 0.15,
+  }))
+  return d3
+    .range(0, W + 1, 10)
+    .map((px) => [
+      px,
+      d3.sum(
+        swells,
+        (s) => s.height * Math.exp(-(((px - s.at) / s.width) ** 2))
+      ),
+    ])
+}
 
-// Pins on its ridge: released, first ranked, best, and tonight or last ranked
+const mine = ridge.points.map(([t, h]): [number, number] => [x(t), h * BOLD])
+const rows = d3.range(ROWS).map((i) => {
+  const on = i === CONTEXT
+  const base = TOP + i * GAP
+  const shake = wobble(on ? id : `${id}-${i}`)
+  const shape = (on ? mine : madeUp(`${id}-${i}`)).map(
+    ([px, h]): [number, number] => [px, base - h * PEAK + shake(px)]
+  )
+  const area = `${line(shape)}L${W},${base + 3}L0,${base + 3}Z`
+  return { on, shape, area, ink: line(shape)! }
+})
+const inked = rows[CONTEXT]!.shape
+
+// Pins on its ridge: released, first ranked, best, and now or last ranked
 const at = (date: string) =>
-  mine[Math.min(mine.length - 1, Math.round((utc(date) - start) / DAY))]!
+  inked[Math.min(inked.length - 1, Math.round((utc(date) - start) / DAY))]!
+// The year is under the chart, so the pins leave it out: "May 17"
+const day = (date: string) =>
+  new Date(utc(date)).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  })
 const inYear = (date: string | null): date is string =>
   !!date?.startsWith(`${year}-`)
-const { release_date, firstNight, bestNight, lastNight, best, tonight } = movie
+const { release_date, firstNight, bestNight, lastNight, best, current } = movie
 const pins: { date: string; label: string; accent?: boolean }[] = []
 if (inYear(release_date) && utc(release_date) < end) {
   pins.push({
     date: release_date,
-    label: `Released ${formatDate(release_date)}`,
+    label: `Released ${day(release_date)}`,
   })
 }
 if (inYear(firstNight)) {
   const atBest = bestNight === firstNight ? ` · Best #${best}` : ""
   pins.push({
     date: firstNight,
-    label: `First ranked ${formatDate(firstNight)}${atBest}`,
+    label: `Added ${day(firstNight)}${atBest}`,
   })
 }
 if (inYear(bestNight) && bestNight !== firstNight) {
@@ -72,14 +95,13 @@ if (inYear(bestNight) && bestNight !== firstNight) {
 }
 if (inYear(lastNight) && lastNight !== firstNight) {
   pins.push(
-    tonight
-      ? { date: lastNight, label: `Tonight #${tonight}`, accent: true }
-      : { date: lastNight, label: `Last ranked ${formatDate(lastNight)}` }
+    current
+      ? { date: lastNight, label: `Now #${current}`, accent: true }
+      : { date: lastNight, label: `Last on the list ${day(lastNight)}` }
   )
 }
 
-// Pins a few days apart share one label; the rest alternate short and tall
-// stems so neighbouring labels don't collide. Labels lean toward the middle.
+// Pins a few days apart share one label
 const placed: { label: string; accent?: boolean; left: number; top: number }[] =
   []
 for (const pin of pins.toSorted((a, b) => a.date.localeCompare(b.date))) {
@@ -93,6 +115,46 @@ for (const pin of pins.toSorted((a, b) => a.date.localeCompare(b.date))) {
     placed.push({ ...pin, left, top: (py / H) * 100 })
   }
 }
+
+// Where each label goes: on the low row or the tall one above it, running
+// right or left of its stem. Every arrangement is tried (there are at most four
+// pins) and the first that fits wins: on the chart, no two labels in a row
+// overlapping, and no tall stem passing through a low label. Widths are
+// guessed for a phone, the tightest fit; wider screens only have more room.
+const PHONE = 375
+const widthOf = (label: string) =>
+  (Math.min(label.length * 6.5 + 8, 0.42 * PHONE) / PHONE) * 100
+type Spot = { tall: boolean; right: boolean }
+function problems(spots: Spot[]) {
+  const spans = spots.map(({ right }, i): [number, number] => {
+    const { left, label } = placed[i]!
+    return right ? [left, left + widthOf(label)] : [left - widthOf(label), left]
+  })
+  let count = 0
+  spots.forEach((spot, i) => {
+    const [from, to] = spans[i]!
+    if (from < 0 || to > 100) count++
+    spots.forEach((other, j) => {
+      if (j === i) return
+      const crossed = from < placed[j]!.left && placed[j]!.left < to
+      if (!spot.tall && other.tall && crossed) count++
+      const [otherFrom, otherTo] = spans[j]!
+      if (j > i && spot.tall === other.tall && from < otherTo && otherFrom < to)
+        count++
+    })
+  })
+  // Short stems and labels leaning toward the middle, all else equal
+  return count + spots.filter((spot) => spot.tall).length / 100
+}
+const spots = d3.least(
+  d3.range(4 ** placed.length).map((n) =>
+    placed.map((_, i): Spot => {
+      const bits = Math.floor(n / 4 ** i) % 4
+      return { tall: bits >= 2, right: bits % 2 === 1 }
+    })
+  ),
+  problems
+)!
 
 const months = d3
   .utcMonths(new Date(start), new Date(end - 14 * DAY))
@@ -112,24 +174,27 @@ const months = d3
       preserveAspectRatio="none"
       style={`aspect-ratio:${W}/${H}`}
       role="img"
-      aria-label={`${movie.title} beside the movies that joined the standings around it in ${year}`}
+      aria-label={`How high ${movie.title} ranked in ${year}`}
     >
-      {rows.map(({ on, area, ink }) => (
-        <g class:list={[on && "on"]}>
-          <path class="fill" d={area} />
-          <path class="ink" d={ink} />
-        </g>
-      ))}
+      {/* Its own ridge drawn last, so no row covers it */}
+      {rows
+        .toSorted((a, b) => +a.on - +b.on)
+        .map(({ on, area, ink }) => (
+          <g class:list={[on && "on"]}>
+            <path class="fill" d={area} />
+            <path class="ink" d={ink} />
+          </g>
+        ))}
     </svg>
     {placed.map(({ label, left, top, accent }, i) => (
       <div
         class:list={[
           "pin",
-          left < 50 ? "start" : "end",
-          i % 2 === 1 && "tall",
+          spots[i]!.right ? "start" : "end",
+          spots[i]!.tall && "tall",
           accent && "accent",
         ]}
-        style={`left:${left}%;top:${top}%`}
+        style={`left:${left}%;--y:${top}%`}
       >
         <span>{label}</span>
       </div>
@@ -144,8 +209,10 @@ const months = d3
 </figure>
 
 <style>
+  /* Room above for the pins' labels */
   .plot {
     position: relative;
+    margin-top: 4.5rem;
   }
   .plot svg {
     display: block;
@@ -167,11 +234,12 @@ const months = d3
     stroke: var(--foreground);
     stroke-width: 2.25;
   }
+  /* A stem from its night on the ridge up past the chart's top, where every
+     label sits, clear of the ridges; alternate pins reach a row higher */
   .pin {
     position: absolute;
-    height: 36px;
-    margin-top: -6px;
-    transform: translateY(-100%);
+    top: -0.5rem;
+    height: calc(var(--y) + 0.5rem);
     border-left: 1px solid currentColor;
     color: var(--foreground);
     font-size: 13px;
@@ -180,7 +248,8 @@ const months = d3
     color: var(--primary);
   }
   .pin.tall {
-    height: 72px;
+    top: -3rem;
+    height: calc(var(--y) + 3rem);
   }
   .pin span {
     position: absolute;
@@ -188,8 +257,12 @@ const months = d3
     width: max-content;
     max-width: min(16rem, 42vw);
     padding: 2px 4px;
-    background: var(--background);
     line-height: 1.25;
+    /* A halo, so a neighbouring stem passing behind stays readable */
+    text-shadow:
+      0 0 2px var(--background),
+      0 0 2px var(--background),
+      0 0 4px var(--background);
   }
   .pin.end span {
     text-align: right;

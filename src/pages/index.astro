@@ -1,6 +1,24 @@
 ---
 import { SITE } from "@/consts"
 import Standings from "@/layouts/standings.astro"
+import { moviePath } from "@/lib/links"
+import { getMovies, getStandings } from "@/lib/movies"
+
+// Paths from the same titles the movie pages are built from
+const pages = new Map((await getMovies()).map((m) => [m.id, moviePath(m)]))
+const listed = (await getStandings()).map((movie) => ({
+  id: movie.tmdb_id,
+  title: movie.title,
+  poster_url: movie.poster_url,
+  genres: movie.genres,
+  href: pages.get(movie.tmdb_id)!,
+}))
 ---
 
-<Standings title={SITE.title} description={SITE.description} view="chart" />
+<Standings
+  title={SITE.title}
+  description={SITE.description}
+  choice="current"
+  listed={listed}
+  listName="The best movies of the past year"
+/>

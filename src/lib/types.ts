@@ -1,7 +1,7 @@
 // The published files, shared by the nightly pipeline and the site.
 //
 // Public contract, Steven Lu's popular-movies format (an array of ListMovie):
-//   best-pictures.json            tonight's standings
+//   best-pictures.json            the current standings
 //   best-pictures-YYYYMMDD.json   each night's standings, like his movies-YYYYMMDD.json
 //
 // The site's own working data, not a contract (free to change):

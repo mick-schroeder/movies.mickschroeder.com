@@ -7,6 +7,7 @@ import Layout from "@/layouts/base.astro"
 import { movieLinks, moviePath } from "@/lib/links"
 import { getMovies, getStandings, type MovieSummary } from "@/lib/movies"
 import { formatDate } from "@/lib/ridgeline"
+import { ArrowLeft, ArrowRight, ArrowUpRight } from "lucide-react"
 import { genreLabel } from "@/lib/utils"
 import {
   type SimpleIcon,
@@ -30,7 +31,7 @@ export async function getStaticPaths() {
 const { movie } = Astro.props as { movie: MovieSummary }
 const links = movieLinks(movie)
 
-// Its neighbours in tonight's standings
+// Its neighbours in the current standings
 const standings = await getStandings()
 const neighbour = (rank: number) => {
   const item = standings[rank - 1]
@@ -42,8 +43,8 @@ const neighbour = (rank: number) => {
     }
   )
 }
-const prev = movie.tonight && neighbour(movie.tonight - 1)
-const next = movie.tonight && neighbour(movie.tonight + 1)
+const prev = movie.current && neighbour(movie.current - 1)
+const next = movie.current && neighbour(movie.current + 1)
 
 // Each service's logo
 const ICONS: Record<string, SimpleIcon> = {
@@ -70,7 +71,6 @@ const runtime = [hours && `${hours}h`, minutes && `${minutes}m`]
 // One fact per line under the title, App Store style
 const details = [
   [released && `Released ${released}`, runtime].filter(Boolean).join(" · "),
-  `${movie.nights} night${movie.nights === 1 ? "" : "s"} ranked`,
 ].filter(Boolean)
 
 const jsonLd = [
@@ -88,7 +88,7 @@ const jsonLd = [
 
 <Layout
   title={`${movie.title}${releaseYear ? ` (${releaseYear})` : ""} · ${SITE.title}`}
-  description={`How ${movie.title} has ranked in ${SITE.title}, night by night.`}
+  description={`${movie.title}${releaseYear ? ` (${releaseYear})` : ""}, one of the best movies of the year, ranked by our AI editor.`}
   jsonLd={jsonLd}
 >
   <section class="overflow-hidden">
@@ -147,9 +147,10 @@ const jsonLd = [
             >
               {ICONS[name] && <BrandIcon icon={ICONS[name]} />}
               <span class="flex-1">{name}</span>
-              <span aria-hidden="true" class="text-muted-foreground">
-                ↗
-              </span>
+              <ArrowUpRight
+                aria-hidden="true"
+                className="size-4 text-muted-foreground"
+              />
             </a>
           </li>
         ))}
@@ -157,11 +158,15 @@ const jsonLd = [
     </nav>
 
     {(prev || next) && (
-      <nav aria-label="Tonight’s standings" class="grid grid-cols-2 gap-6">
+      <nav aria-label="Current standings" class="grid grid-cols-2 gap-6">
         {prev ? (
           <a href={prev.href} class="group flex flex-col gap-1">
-            <span class="text-sm text-muted-foreground">
-              ← #{prev.rank} tonight
+            <span class="flex items-center gap-1 font-heading text-5xl leading-none font-extrabold tracking-[-0.05em] text-muted-foreground tabular-nums group-hover:text-foreground sm:text-6xl">
+              <ArrowLeft
+                aria-hidden="true"
+                className="size-9 shrink-0 stroke-[2.5] sm:size-11"
+              />
+              <span class="sr-only">Previous: </span>#{prev.rank}
             </span>
             <span class="font-medium text-balance group-hover:text-primary">
               {prev.title}
@@ -175,8 +180,12 @@ const jsonLd = [
             href={next.href}
             class="group flex flex-col items-end gap-1 text-right"
           >
-            <span class="text-sm text-muted-foreground">
-              #{next.rank} tonight →
+            <span class="flex items-center gap-1 font-heading text-5xl leading-none font-extrabold tracking-[-0.05em] text-muted-foreground tabular-nums group-hover:text-foreground sm:text-6xl">
+              <span class="sr-only">Next: </span>#{next.rank}
+              <ArrowRight
+                aria-hidden="true"
+                className="size-9 shrink-0 stroke-[2.5] sm:size-11"
+              />
             </span>
             <span class="font-medium text-balance group-hover:text-primary">
               {next.title}

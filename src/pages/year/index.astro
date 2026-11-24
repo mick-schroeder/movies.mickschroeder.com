@@ -1,0 +1,84 @@
+---
+// Every year's page, newest first, each with its top movies
+import { SITE } from "@/consts"
+import Layout from "@/layouts/base.astro"
+import { getYearList, getYears } from "@/lib/movies"
+import { ArrowRight } from "lucide-react"
+
+const TOP = 6
+const years = await Promise.all(
+  getYears().map(async (year) => ({
+    year,
+    movies: (await getYearList(year)).slice(0, TOP),
+  }))
+)
+const description = "The best movies of every year, ranked by our AI editor."
+const jsonLd = [
+  {
+    "@type": "ItemList",
+    name: "The best movies by year",
+    itemListElement: years.map(({ year }, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      url: new URL(`/year/${year}/`, SITE.url).href,
+      name: `The best movies of ${year}`,
+    })),
+  },
+]
+---
+
+<Layout title={`Best movies by year · ${SITE.title}`} {description} {jsonLd}>
+  <div class="px-4 pt-8 pb-6 sm:px-6 sm:pt-12">
+    <h1 class="font-heading text-[clamp(3.25rem,13vw,11rem)] leading-[0.82] font-extrabold tracking-[-0.055em]">
+      By year
+    </h1>
+    <p class="mt-4 text-xl font-medium text-balance text-muted-foreground sm:text-2xl">
+      {description}
+    </p>
+  </div>
+  <div class="flex flex-col gap-14 px-4 pt-6 sm:px-6">
+    {years.map(({ year, movies }) => (
+      <section aria-labelledby={`year-${year}`}>
+        <h2
+          id={`year-${year}`}
+          class="font-heading text-5xl font-extrabold tracking-[-0.05em] sm:text-6xl"
+        >
+          <a
+            href={`/year/${year}/`}
+            class="inline-flex items-center gap-2 hover:text-primary"
+          >
+            {year}
+            <ArrowRight
+              aria-hidden="true"
+              className="size-10 stroke-[2.5] sm:size-12"
+            />
+          </a>
+        </h2>
+        <ol class="mt-5 grid grid-cols-3 gap-4 sm:grid-cols-6">
+          {movies.map((movie, i) => (
+            <li class={i >= 3 ? "max-sm:hidden" : undefined}>
+              <a href={movie.href} class="group flex flex-col gap-2">
+                <div class="aspect-2/3 overflow-hidden rounded-sm bg-muted">
+                  {movie.poster_url && (
+                    <img
+                      src={movie.poster_url.replace("/w500/", "/w342/")}
+                      alt=""
+                      width="342"
+                      height="513"
+                      loading="lazy"
+                      decoding="async"
+                      class="size-full object-cover"
+                    />
+                  )}
+                </div>
+                <span class="text-sm leading-snug font-medium group-hover:text-primary">
+                  {movie.title}
+                </span>
+              </a>
+            </li>
+          ))}
+        </ol>
+      </section>
+    ))}
+  </div>
+</Layout>

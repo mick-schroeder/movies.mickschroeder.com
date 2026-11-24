@@ -2,7 +2,8 @@
 // public/; without them (local dev, CI) uses the live site's files instead.
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
-import { SITE } from "@/consts"
+import { FIRST_YEAR, SITE } from "@/consts"
+import { moviePath } from "@/lib/links"
 import { type Ridge, ridges, yearOf, yearSpan } from "@/lib/ridgeline"
 import type { Catalog, CatalogMovie, ListMovie, RankDay } from "@/lib/types"
 
@@ -21,7 +22,7 @@ async function load<T>(name: string): Promise<T | null> {
 }
 
 let standings: Promise<ListMovie[]> | undefined
-/** Tonight's standings, best first. */
+/** The current standings, best first. */
 export function getStandings(): Promise<ListMovie[]> {
   standings ??= load<ListMovie[]>("best-pictures.json").then((list) => {
     if (!list) throw new Error("best-pictures.json not found")
@@ -65,10 +66,36 @@ export function getYear(year: number): Promise<YearRidges> {
   return years.get(year)!
 }
 
+/** Every year with a page, newest first. */
+export function getYears(): number[] {
+  const thisYear = new Date().getUTCFullYear()
+  return Array.from(
+    { length: thisYear - FIRST_YEAR + 1 },
+    (_, i) => thisYear - i
+  )
+}
+
+/** A year's movies, best first, as its page lists them. */
+export async function getYearList(year: number) {
+  const [{ ridges }, { catalog }] = await Promise.all([
+    getYear(year),
+    getHistory(),
+  ])
+  return ridges
+    .toSorted((a, b) => a.rank - b.rank)
+    .map((ridge) => ({
+      id: Number(ridge.id),
+      title: ridge.title,
+      poster_url: catalog[ridge.id]?.poster_url ?? null,
+      genres: catalog[ridge.id]?.genres ?? [],
+      href: moviePath(ridge),
+    }))
+}
+
 export interface MovieSummary extends CatalogMovie {
   id: number
-  /** Tonight's rank, or null if it isn't in tonight's standings. */
-  tonight: number | null
+  /** Its current rank, or null if it isn't in the current standings. */
+  current: number | null
   best: number | null
   /** The first night it reached its best rank. */
   bestNight: string | null
@@ -79,7 +106,7 @@ export interface MovieSummary extends CatalogMovie {
   years: number[]
 }
 
-/** Every movie that has been in the standings, or is tonight. */
+/** Every movie that has been in the standings, or is now. */
 export async function getMovies(): Promise<MovieSummary[]> {
   const [list, { rankings, catalog }] = await Promise.all([
     getStandings(),
@@ -92,7 +119,7 @@ export async function getMovies(): Promise<MovieSummary[]> {
       movie = {
         id,
         ...info,
-        tonight: null,
+        current: null,
         best: null,
         bestNight: null,
         nights: 0,
@@ -128,7 +155,7 @@ export async function getMovies(): Promise<MovieSummary[]> {
       trailer_url: null,
       ...catalog[item.tmdb_id],
     })
-    movie.tonight = i + 1
+    movie.current = i + 1
   })
 
   return [...movies.values()]

@@ -1,6 +1,6 @@
 # Best Pictures
 
-Movies from the past year, recommended and ranked nightly by our AI editor.
+The best movies of the past year, ranked by our AI editor.
 
 This started as a fork of [sjlu/popular-movies](https://github.com/sjlu/popular-movies)
 by Steven Lu. `best-pictures.json` keeps **the same JSON format**, so anything that read the
@@ -18,7 +18,7 @@ https://movies.mickschroeder.com/best-pictures.json
 
 | File                                                                      | Contents                                                                     |
 | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| [best-pictures.json](https://movies.mickschroeder.com/best-pictures.json) | Tonight's standings: 25 movies, best first                                   |
+| [best-pictures.json](https://movies.mickschroeder.com/best-pictures.json) | The current standings: 25 movies, best first                                 |
 | `best-pictures-YYYYMMDD.json`                                             | One night's standings in the same format, e.g. `best-pictures-20261123.json` |
 
 `best-pictures.json` is a JSON array of:
@@ -54,7 +54,7 @@ The repo is one Astro + shadcn site with the data pipeline as a build step:
 ```
 pipeline/   nightly data: TMDB + MDBList + AI scoring -> public/best-pictures*.json, public/data/
 src/        the site (Astro pages, React islands, shadcn components)
-public/     static files copied as-is (llms.txt, robots.txt, and tonight's data once built)
+public/     static files copied as-is (llms.txt, robots.txt, and the latest data once built)
 infra/      AWS stack: S3 + CloudFront + GitHub OIDC role
 ```
 
@@ -67,7 +67,7 @@ infra/      AWS stack: S3 + CloudFront + GitHub OIDC role
      standing (`SMOOTHING` in `pipeline/config.ts`); a new movie starts at its first score. The top 25
      are tonight's standings.
    - Write - Checks everything, then writes `best-pictures.json`, tonight's `best-pictures-YYYYMMDD.json` and `data/` to `public/`.
-2. `pnpm build` builds the site into `dist/`: the year's chart, tonight's 25, and a page for
+2. `pnpm build` builds the site into `dist/`: the current standings (`/`), a page for each year (`/year/{year}/`), and a page for
    every movie that has been in the standings (`/title/{tmdb_id}-{title}/`): its year as a short joyplot of the movies that joined around it, its own ridge in bold
    and its release, first, best and latest nights pinned on it, plus links to TMDB, IMDb, Letterboxd, MDBList, Rotten Tomatoes, Metacritic and Trakt.
    Without `public/best-pictures.json` (local dev, CI) it uses the live file instead.

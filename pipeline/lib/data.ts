@@ -46,7 +46,9 @@ export async function load({ allowMissing = false } = {}) {
   ])
   if (rankings && catalog && scores) return { rankings, catalog, scores }
   if (allowMissing && !rankings) return null
-  throw new Error(`${config.SITE_URL}/data/ is missing a file`)
+  throw new Error(
+    `${config.SITE_URL}/data/ is missing a file (first run? use --new-history)`
+  )
 }
 
 // Records `movies` (best first) as the standings for `date`, refreshes their details,

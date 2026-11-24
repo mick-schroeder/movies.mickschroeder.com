@@ -1,7 +1,6 @@
 export const SITE = {
   title: "Best Pictures",
-  description:
-    "Movies from the past year, recommended and ranked nightly by our AI editor.",
+  description: "The best movies of the past year, ranked by our AI editor.",
   url: "https://movies.mickschroeder.com",
   code: "https://github.com/mick-schroeder/movies.mickschroeder.com",
 }
