@@ -1,7 +1,7 @@
 // The ridge math shared by the standings chart and the movie pages.
 // A ridge's height each night is how high the movie ranked (#1 tallest, off the list
 // flat; squared so the top spots stand out, with a floor so every ranked night
-// shows), smoothed over two weeks so nightly wobbles don't show.
+// shows), smoothed over about two weeks so nightly wobbles don't show.
 import { bisector, randomLcg } from "d3"
 import { LIST_SIZE as MAX_RANK } from "@/consts"
 import type { RankDay, RankHistory } from "@/lib/types"
@@ -74,10 +74,14 @@ export function ridgeline(
     heights.push(night ? height(byDate[night]) : 0)
   }
 
+  // A triangle-weighted average, so a jump rises with rounded shoulders. The
+  // window narrows toward either end, so the latest night shows as it is.
   const half = Math.floor(SMOOTH_DAYS / 2)
   return heights.map((_, i) => {
-    const window = heights.slice(Math.max(0, i - half), i + half + 1)
-    return [start + i * DAY, window.reduce((a, b) => a + b, 0) / window.length]
+    const h = Math.min(half, i, heights.length - 1 - i)
+    let sum = 0
+    for (let j = -h; j <= h; j++) sum += (h + 1 - Math.abs(j)) * heights[i + j]!
+    return [start + i * DAY, sum / (h + 1) ** 2]
   })
 }
 

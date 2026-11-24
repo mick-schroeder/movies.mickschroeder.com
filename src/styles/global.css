@@ -119,14 +119,22 @@
   .standings-chart .ridge path.fill {
     stroke: none;
   }
+  /* Fills stay opaque while highlighting, so ridges still hide the rows behind:
+     a dark emerald tint under the highlighted line, the other lines dimmed */
   .standings-chart .ridge.on path.fill {
-    fill: var(--primary);
+    fill: color-mix(in oklch, var(--primary) 18%, var(--background));
+  }
+  .standings-chart .ridges:has(.on) .ridge:not(.on) {
+    --dim: color-mix(in oklch, var(--foreground) 40%, var(--background));
+    path {
+      stroke: var(--dim);
+    }
+    .release {
+      fill: var(--dim);
+    }
   }
   .standings-chart .ridge.on .release {
     fill: var(--primary);
-  }
-  .standings-chart .label {
-    pointer-events: none;
   }
   .standings-chart .label rect {
     fill: var(--background);
@@ -134,7 +142,7 @@
   .standings-chart .label text {
     fill: var(--muted-foreground);
   }
-  .standings-chart .label.on text {
+  .standings-chart .ridge.on .label text {
     fill: var(--primary);
     font-weight: 600;
   }

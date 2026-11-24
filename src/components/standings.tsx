@@ -53,22 +53,25 @@ import { genreLabel } from "@/lib/utils"
 import type { RankHistory } from "@/lib/types"
 
 /**
- * Row spacing, title size and title column width at Tailwind's breakpoints
- * (sm 640, lg 1024, xl 1280). Phones have no room for titles.
+ * Row spacing, title size, title column width, longest title (in characters) and
+ * how many rows tall a #1 ridge stands, at Tailwind's breakpoints (sm 640, lg 1024,
+ * xl 1280). Phones get a narrower column and shorter titles; wide screens taller
+ * peaks, so the ridges don't look stretched.
  */
 function sizes(width: number) {
-  if (width >= 1280) return { row: 14, font: 13, column: 220 }
-  if (width >= 1024) return { row: 13, font: 12, column: 205 }
-  if (width >= 640) return { row: 12, font: 11, column: 190 }
-  return { row: 7, font: 0, column: 0 }
+  if (width >= 1280)
+    return { row: 14, font: 13, column: 220, chars: 30, peak: 12 }
+  if (width >= 1024)
+    return { row: 13, font: 12, column: 205, chars: 30, peak: 10 }
+  if (width >= 640)
+    return { row: 12, font: 11, column: 190, chars: 30, peak: 9 }
+  return { row: 10, font: 9, column: 105, chars: 22, peak: 9 }
 }
-const PEAK = 9 // a #1 ridge is this many rows tall
 
 // The highlighted ridge comes to the front so its whole shape shows
 function highlight(chart: HTMLElement, id: string | null) {
-  const root = d3.select(chart)
-  root.selectAll<SVGGElement, Ridge>(".label").classed("on", (d) => d.id === id)
-  const all = root
+  const all = d3
+    .select(chart)
     .selectAll<SVGAElement, Ridge>(".ridge")
     .classed("on", (d) => d.id === id)
   if (id === null) all.sort((a, b) => a.row - b.row)
@@ -152,9 +155,7 @@ function draw(
   const { start, end, movies } = rows(view, order, reversed)
 
   const width = chart.clientWidth
-  const { row, font, column } = sizes(width)
-  const labels = font > 0
-  const peak = PEAK
+  const { row, font, column, chars, peak } = sizes(width)
   const top = row * peak
   const bottom = 40
   const height = top + (movies.length - 1) * row + bottom
@@ -163,10 +164,7 @@ function draw(
   // Sorted by rank, each title leads with it ("12. ")
   const ranked = order === "rank"
   const rankWidth = ranked ? font * 0.6 * (String(movies.length).length + 1) : 0
-  const x = d3.scaleUtc(
-    [start, end],
-    [labels ? labelX + rankWidth + column : 0, width - 12]
-  )
+  const x = d3.scaleUtc([start, end], [labelX + rankWidth + column, width - 12])
   // Each ridge in pixels, wobble included: [x, y above its baseline]. Every line
   // runs in flat from the left edge (through its title) and carries on at its
   // latest height to the right edge.
@@ -211,6 +209,8 @@ function draw(
         : `How high each movie ranked across ${data.year}`
     )
 
+  const monthWidth =
+    (x.range()[1]! - x.range()[0]!) / ((end - start) / (30 * DAY))
   svg
     .append("g")
     .selectAll("text")
@@ -220,7 +220,11 @@ function draw(
     .attr("x", (d) => x(d) + 6)
     .attr("y", height - 14)
     .text((d) =>
-      d.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" })
+      d.toLocaleDateString("en-US", {
+        // A letter a month when they're too close for "Jan"
+        month: monthWidth < 32 ? "narrow" : "short",
+        timeZone: "UTC",
+      })
     )
 
   // Each ridge is a link to its movie's page, so it works from the keyboard and
@@ -255,24 +259,21 @@ function draw(
     .attr("cx", (d) => x(utc(d.release_date!)))
     .attr("r", 2)
 
-  // Titles in their own column, each on its own line, with a black plate
-  // so the line passes behind it
-  const label = labels
-    ? svg
-        .append("g")
-        .selectAll("g")
-        .data(movies)
-        .join("g")
-        .attr("class", "label")
-        .attr("transform", (_, i) => `translate(${labelX},${top + i * row})`)
-    : null
-  label?.append("rect")
+  // Titles in their own column, each on its own line, with a black plate so the
+  // line passes behind it. Part of the ridge's link, so a flat ridge can still be
+  // hovered and tapped by its title.
+  const label = ridge
+    .append("g")
+    .attr("class", "label")
+    .attr("transform", `translate(${labelX},0)`)
+  label.append("rect")
   label
-    ?.append("text")
+    .append("text")
     .attr("y", font * 0.35)
     .attr("font-size", font)
     .text((d) => {
-      const title = d.title.length > 30 ? d.title.slice(0, 29) + "…" : d.title
+      const title =
+        d.title.length > chars ? d.title.slice(0, chars - 1) + "…" : d.title
       return ranked ? `${d.rank}. ${title}` : title
     })
 
