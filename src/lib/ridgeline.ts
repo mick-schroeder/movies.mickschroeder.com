@@ -68,10 +68,14 @@ export const ridgeArea = area<RidgePoint>()
 
 /** What a chart draws: some nights' standings and the movies in them. */
 export interface ChartData {
-  /** The calendar year shown, or for the last 365 days the latest night's. */
+  /** The year shown: a calendar year, a release year, or for the last 365 days
+   * the latest night's. */
   year: number
   days: RankDay[]
   movies: Catalog
+  /** A year's list (best-pictures-YYYY.json ids, best first), if given: only
+   * these movies, ranked in this order. */
+  list?: number[]
 }
 
 export interface Ridge {
@@ -85,8 +89,9 @@ export interface Ridge {
   nights: number
   /** Rank on the latest night, or null if it wasn't ranked then. */
   last: number | null
-  /** Rank for the whole span: points every night it was ranked (#1 scores
-   * MAX_RANK, the last spot 1), totalled. Roughly the area under its ridge. */
+  /** Its place in the chart's list if it has one, otherwise by points every
+   * night it was ranked (#1 scores MAX_RANK, the last spot 1), totalled,
+   * roughly the area under its ridge. */
   rank: number
   points: [number, number][]
 }
@@ -148,6 +153,7 @@ export function ridges(
   const joined: Record<string, string> = {}
   for (const night of data.days) {
     night.ids.forEach((id, i) => {
+      if (data.list && !data.list.includes(id)) return
       if (!ranks[id]) {
         ranks[id] = {}
         joined[id] = night.date
@@ -158,7 +164,9 @@ export function ridges(
   }
   const points = (id: string) =>
     Object.values(ranks[id]!).reduce((sum, r) => sum + MAX_RANK + 1 - r, 0)
-  const standing = order.toSorted((a, b) => points(b) - points(a))
+  const standing = data.list
+    ? data.list.map(String)
+    : order.toSorted((a, b) => points(b) - points(a))
   return order.map((id, row) => {
     const nightRanks = Object.values(ranks[id]!)
     const movie = data.movies[id]
@@ -188,6 +196,26 @@ export const yearOf = (
   movies,
 })
 
+/** A year's list (best-pictures-YYYY.json), over every night its movies were
+ * ranked, which can run into the next year. */
+export function yearListOf(
+  rankings: RankDay[],
+  movies: Catalog,
+  list: number[],
+  year: number
+): ChartData {
+  const listed = rankings.filter((night) =>
+    night.ids.some((id) => list.includes(id))
+  )
+  const [first, last] = [listed[0]?.date ?? "", listed.at(-1)?.date ?? ""]
+  return {
+    year,
+    days: rankings.filter((night) => night.date >= first && night.date <= last),
+    movies,
+    list,
+  }
+}
+
 /** The last 365 days of nights, up to the latest. */
 export function pastYear(rankings: RankDay[], movies: Catalog): ChartData {
   const latest = rankings.at(-1)
@@ -201,13 +229,9 @@ export function pastYear(rankings: RankDay[], movies: Catalog): ChartData {
   }
 }
 
-/** First and last day the chart shows: the whole year, or up to the latest night. */
+/** First and last day the chart shows: from the start of the year up to the last night. */
 export function yearSpan(data: { year: number; days: RankDay[] }) {
   const start = Date.UTC(data.year, 0, 1)
-  const latest = data.days[data.days.length - 1]
-  const end = Math.min(
-    Date.UTC(data.year + 1, 0, 1),
-    latest ? utc(latest.date) + DAY : start + DAY
-  )
-  return { start, end }
+  const latest = data.days.at(-1)
+  return { start, end: latest ? utc(latest.date) + DAY : start + DAY }
 }

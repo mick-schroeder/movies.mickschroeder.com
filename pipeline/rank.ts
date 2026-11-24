@@ -50,12 +50,14 @@ export async function getMovies(): Promise<Movie[]> {
 // Each movie's standing score: a moving average of its nightly AI scores, so one noisy
 // night moves it a little and a real change shows within a week or so.
 // A new movie starts at tonight's score; a movie the AI skipped tonight keeps its standing.
+// A movie that left the pool keeps its last score for good: its final verdict, which
+// the year pages rank by.
 export function standingScores(
   movies: { id: number }[],
   tonight: Scores,
   previous: Scores
 ): Scores {
-  const scores: Scores = {}
+  const scores: Scores = { ...previous }
   for (const { id } of movies) {
     const before = previous[id]
     const now = tonight[id]

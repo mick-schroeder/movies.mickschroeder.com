@@ -1,5 +1,5 @@
 ---
-// One calendar year's standings, a permanent page per year
+// One year's best-pictures-YYYY.json, a permanent page per year
 import { SITE } from "@/consts"
 import Standings from "@/layouts/standings.astro"
 import { getYearList, getYears } from "@/lib/movies"
@@ -14,7 +14,7 @@ const listed = await getYearList(Number(year))
 
 <Standings
   title={`Best movies of ${year} · ${SITE.title}`}
-  description={`The best movies of ${year}, ranked by our AI editor.`}
+  description={`The best movies of ${year}, ranked by an AI critic.`}
   choice={year}
   listed={listed}
   listName={`The best movies of ${year}`}

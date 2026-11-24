@@ -1,0 +1,145 @@
+---
+// How the lists are made, and where to get them as JSON
+import { CopyUrl } from "@/components/copy-url"
+import MovieJoyplot from "@/components/movie-joyplot.astro"
+import { LIST_SIZE, SITE } from "@/consts"
+import Layout from "@/layouts/base.astro"
+import { getMovies, getYears } from "@/lib/movies"
+import { moviePath } from "@/lib/links"
+
+const description =
+  "How the AI critic ranks the best movies, and the lists as JSON feeds."
+const years = getYears()
+const prompt = `${SITE.code}/blob/main/pipeline/prompts/rank-movies.md`
+const link = "underline hover:text-primary"
+
+// Tonight's #1, as the example of how to read a ridge
+const top = (await getMovies()).find((movie) => movie.current === 1)
+---
+
+<Layout title={`About · ${SITE.title}`} {description}>
+  <div class="px-4 pt-8 pb-6 sm:px-6 sm:pt-12">
+    <h1 class="font-heading text-[clamp(3.25rem,13vw,11rem)] leading-[0.82] font-extrabold tracking-[-0.055em]">
+      About
+    </h1>
+    <p class="mt-4 max-w-3xl text-xl font-medium text-balance text-muted-foreground sm:text-2xl">
+      An AI critic re-ranks the past 12 months of movies every night. Here’s
+      how, and how to use the lists.
+    </p>
+  </div>
+
+  {top && (
+    <section aria-labelledby="read" class="flex flex-col">
+      <div class="h-[min(55svh,26rem)] flex flex-col">
+        <MovieJoyplot movie={top} year={top.years.at(-1)!} />
+      </div>
+      <div class="flex max-w-3xl flex-col gap-3 px-4 pt-4 sm:px-6">
+        <h2
+          id="read"
+          class="font-heading text-3xl font-extrabold tracking-tight"
+        >
+          Reading the ridges
+        </h2>
+        <p>
+          The bold line is{" "}
+          <a href={moviePath(top)} class={link}>
+            {top.title}
+          </a>
+          , tonight’s #1, over the year. The taller it stands, the higher it
+          ranked that night; flat means it was off the list. On the{" "}
+          <a href="/" class={link}>
+            current standings
+          </a>
+          , every line is a movie.
+        </p>
+      </div>
+    </section>
+  )}
+
+  <div class="flex max-w-3xl flex-col gap-12 px-4 pt-12 pb-6 sm:px-6">
+    <section aria-labelledby="how" class="flex flex-col gap-4">
+      <h2 id="how" class="font-heading text-3xl font-extrabold tracking-tight">
+        How it works
+      </h2>
+      <ol class="flex list-decimal flex-col gap-3 pl-6 marker:font-bold marker:text-muted-foreground">
+        <li>
+          Every night, it gathers every movie released in the past 12 months
+          with at least 500 votes on TMDB.
+        </li>
+        <li>
+          It adds each movie’s ratings from audiences and critics on IMDb,
+          Letterboxd, Rotten Tomatoes and Metacritic, with their vote counts and
+          box office.
+        </li>
+        <li>
+          The AI critic scores each movie from 0 to 100 on how strongly it would
+          recommend it to a friend tonight. It trusts ratings with more votes,
+          favors movies people are watching, and won’t mark down a crowd-pleaser
+          just because critics panned it.
+        </li>
+        <li>
+          Rankings move steadily: tonight’s score counts for a quarter of a
+          movie’s standing, and the night before for the rest. The top{" "}
+          {LIST_SIZE} make the list.
+        </li>
+        <li>
+          Each year’s list ranks the movies released that year by how they did
+          on the nightly lists.
+        </li>
+      </ol>
+      <p class="text-muted-foreground">
+        The AI critic’s{" "}
+        <a href={prompt} class={link}>
+          instructions
+        </a>{" "}
+        and all the{" "}
+        <a href={SITE.code} class={link}>
+          source code
+        </a>{" "}
+        are public.
+      </p>
+    </section>
+
+    <section aria-labelledby="feeds" class="flex flex-col gap-4">
+      <h2
+        id="feeds"
+        class="font-heading text-3xl font-extrabold tracking-tight"
+      >
+        JSON feeds
+      </h2>
+      <p>
+        The lists are free to use, in Steven Lu’s{" "}
+        <a href="https://github.com/sjlu/popular-movies" class={link}>
+          popular-movies
+        </a>{" "}
+        format. In Radarr, add a StevenLu Custom import list and paste a URL.
+        Please fetch at most once a day.
+      </p>
+      <CopyUrl
+        client:visible
+        label="Current"
+        url={`${SITE.url}/best-pictures.json`}
+      />
+      <div class="flex flex-col gap-2">
+        <h3 class="font-semibold">Each year</h3>
+        <ul class="flex flex-wrap gap-x-4 gap-y-1 font-mono text-sm">
+          {years.map((year) => (
+            <li>
+              <a href={`/best-pictures-${year}.json`} class={link}>
+                best-pictures-{year}.json
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div class="flex flex-col gap-2">
+        <h3 class="font-semibold">Each night</h3>
+        <p>
+          <code class="font-mono text-sm">best-pictures-YYYYMMDD.json</code>, in
+          UTC, back to December 2, 2019. Nights before this site ranked its own
+          are Steven Lu’s lists.
+        </p>
+      </div>
+    </section>
+  </div>
+</Layout>

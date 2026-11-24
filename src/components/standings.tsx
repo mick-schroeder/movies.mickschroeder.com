@@ -16,7 +16,6 @@ import {
 } from "lucide-react"
 import {
   type MouseEvent,
-  type ReactNode,
   useEffect,
   useMemo,
   useRef,
@@ -46,24 +45,24 @@ import {
   ridges,
   RUNOUT_DAYS,
   utc,
-  yearOf,
+  yearListOf,
   yearSpan,
 } from "@/lib/ridgeline"
-import { CopyUrl } from "@/components/copy-url"
-import { SITE } from "@/consts"
 import { moviePath } from "@/lib/links"
 import { genreLabel } from "@/lib/utils"
 import type { Catalog, RankDay } from "@/lib/types"
 
 /**
- * Row spacing, title size, title column width and page gutter, at Tailwind's
- * breakpoints (sm 640, lg 1024). Rows are at least 24px apart, so every title
- * is an easy target.
+ * Row spacing (at most, and at least when closing up to fit the screen), title
+ * size, title column width and page gutter, at Tailwind's breakpoints (sm 640,
+ * lg 1024). Phone rows stay 24px apart, so every title is an easy tap.
  */
 function sizes(width: number) {
-  if (width >= 1024) return { row: 26, font: 16, column: 300, gutter: 24 }
-  if (width >= 640) return { row: 24, font: 15, column: 260, gutter: 24 }
-  return { row: 24, font: 14, column: 150, gutter: 16 }
+  if (width >= 1024)
+    return { row: 26, minRow: 18, font: 16, column: 300, gutter: 24 }
+  if (width >= 640)
+    return { row: 24, minRow: 18, font: 15, column: 260, gutter: 24 }
+  return { row: 24, minRow: 24, font: 14, column: 150, gutter: 16 }
 }
 // How many rows tall a #1 ridge stands
 const PEAK = 5
@@ -75,7 +74,7 @@ const ORDERS = {
     compare: (a: Ridge, b: Ridge) => a.rank - b.rank,
   },
   joined: {
-    label: "Recently added",
+    label: "Date added",
     compare: (a: Ridge, b: Ridge) => b.row - a.row,
   },
   release: {
@@ -84,11 +83,11 @@ const ORDERS = {
       (a.release_date ?? "9").localeCompare(b.release_date ?? "9"),
   },
   best: {
-    label: "Best rank",
+    label: "Peak rank",
     compare: (a: Ridge, b: Ridge) => a.best - b.best || b.nights - a.nights,
   },
   title: {
-    label: "Title A–Z",
+    label: "Title",
     compare: (a: Ridge, b: Ridge) => a.title.localeCompare(b.title),
   },
 }
@@ -101,12 +100,12 @@ function badge(d: Ridge, order: Order): string | null {
     rank: String(d.rank),
     joined: formatDate(d.joined),
     release: d.release_date && formatDate(d.release_date),
-    best: `Best #${d.best}`,
+    best: `Peak #${d.best}`,
     title: null,
   }[order]
 }
 
-// What the chart shows: one calendar year, or the current movies over the last 365 days
+// What the chart shows: one year's list, or the current movies over the last 365 days
 interface View {
   data: ChartData
   current: boolean
@@ -120,26 +119,36 @@ function rows({ data, current }: View, order: Order, reversed = false) {
     : yearSpan(data)
   const movies = ridges(data, start, end, RUNOUT_DAYS)
     .filter((movie) => !current || movie.last !== null)
-    // The current view ranks by the latest night's list; a year by its points
+    // The current view ranks by the latest night's list; a year by its list
     .map((movie) => (current ? { ...movie, rank: movie.last! } : movie))
     .sort((a, b) => (reversed ? -1 : 1) * ORDERS[order].compare(a, b))
     .map((movie, row) => ({ ...movie, row }))
   return { start, end, movies }
 }
 
-// Where everything goes at this width
+// Where everything goes at this width, in this much height
 type Layout = ReturnType<typeof layout>
-function layout(view: View, order: Order, reversed: boolean, width: number) {
+function layout(
+  view: View,
+  order: Order,
+  reversed: boolean,
+  width: number,
+  fit: number
+) {
   const { start, end, movies } = rows(view, order, reversed)
-  const size = sizes(width)
-  const top = size.row * PEAK
-  const height = top + (movies.length - 1) * size.row + 40
+  const { minRow, ...size } = sizes(width)
+  // Rows close up so the whole chart fits the screen, down to the floor
+  const fitted = Math.floor((fit - 40) / (movies.length - 1 + PEAK))
+  const row = Math.max(minRow, Math.min(size.row, fitted))
+  const font = Math.min(size.font, Math.round(row * 0.65))
+  const top = row * PEAK
+  const height = top + (movies.length - 1) * row + 40
   // The titles' column at the left; the ridges' days after it
   const x = d3.scaleUtc(
     [start, end + RUNOUT_DAYS * DAY],
     [size.gutter + size.column + 12, width - 12]
   )
-  return { start, end, movies, ...size, top, height, width, x }
+  return { start, end, movies, ...size, row, font, top, height, width, x }
 }
 
 function draw(chart: HTMLElement, l: Layout) {
@@ -254,7 +263,7 @@ const loadHistory = () =>
   ]))
 
 const CURRENT = "current"
-/** What a page shows: the current standings or one calendar year. */
+/** What a page shows: the current standings or one year's list. */
 export type Choice = typeof CURRENT | `${number}`
 /** Each choice's page: / for the current standings, /year/2024/ for a year. */
 export const choicePath = (choice: Choice) =>
@@ -345,14 +354,11 @@ export function Standings({
   years,
   choice,
   listed,
-  children,
 }: {
   years: number[]
   /** The page's list; picking another goes to its page. */
   choice: Choice
   listed: ListedMovie[]
-  /** Shown beside the JSON field (the hero's links). */
-  children?: ReactNode
 }) {
   // The server renders the chart; the browser then shows the visitor's last pick
   const stored = useSyncExternalStore(noSubscribe, storedView, () => "chart")
@@ -362,9 +368,13 @@ export function Standings({
   // Each order has a natural direction (best first, latest added first, A to Z); this flips it
   const [reversed, setReversed] = useState(false)
   const [data, setData] = useState<View | null | undefined>(undefined)
+  // The history couldn't be fetched (the posters still show the page's list)
+  const [failed, setFailed] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(0)
+  // The screen's height left below the chart's top
+  const [fit, setFit] = useState(0)
   // The highlighted movie's id, from the pointer or keyboard focus
   const [hover, setHover] = useState<string | null>(null)
 
@@ -382,29 +392,45 @@ export function Standings({
     const current = choice === CURRENT
     loadHistory().then(([rankings, movies]) => {
       if (cancelled) return
-      if (!rankings || !movies) return setData(null)
+      if (!rankings || !movies) {
+        setFailed(true)
+        return setData(null)
+      }
       const shown = current
         ? pastYear(rankings, movies)
-        : yearOf(rankings, movies, Number(choice))
+        : yearListOf(
+            rankings,
+            movies,
+            listed.map((movie) => movie.id),
+            Number(choice)
+          )
       setData(shown.days.length ? { data: shown, current } : null)
     })
     return () => {
       cancelled = true
     }
-  }, [choice])
+  }, [choice, listed])
 
-  // The chart's width, kept up to date
+  // The chart's width and the height it can fill, kept up to date
   useEffect(() => {
     const wrap = wrapRef.current
     if (!wrap) return
-    const observer = new ResizeObserver(() => setWidth(wrap.clientWidth))
+    const measure = () => {
+      setWidth(wrap.clientWidth)
+      setFit(innerHeight - wrap.getBoundingClientRect().top - scrollY)
+    }
+    const observer = new ResizeObserver(measure)
     observer.observe(wrap)
-    return () => observer.disconnect()
+    addEventListener("resize", measure)
+    return () => {
+      observer.disconnect()
+      removeEventListener("resize", measure)
+    }
   }, [view, data])
 
   const shown = useMemo(
-    () => (data && width ? layout(data, order, reversed, width) : null),
-    [data, order, reversed, width]
+    () => (data && width ? layout(data, order, reversed, width, fit) : null),
+    [data, order, reversed, width, fit]
   )
   // Drawn again when coming back from posters, into a new, empty chart
   useEffect(() => {
@@ -447,7 +473,7 @@ export function Standings({
   }, [data, order, reversed, listed])
 
   const items: { value: Choice; label: string }[] = [
-    { value: CURRENT, label: "Current" },
+    { value: CURRENT, label: "Past 12 months" },
     ...years.map((y) => ({ value: `${y}` as const, label: String(y) })),
   ]
   const orders = Object.entries(ORDERS).map(([value, { label }]) => ({
@@ -457,11 +483,6 @@ export function Standings({
 
   return (
     <>
-      {/* The current list; each night's is also kept as best-pictures-YYYYMMDD.json */}
-      <div className="mt-6 flex flex-wrap items-end gap-2 px-4 sm:px-6">
-        <CopyUrl label="JSON" url={`${SITE.url}/best-pictures.json`} />
-        {children}
-      </div>
       {/* What to show, then how to order it, under the title */}
       <div className="relative z-10 mt-6 flex flex-wrap gap-2 px-4 sm:px-6">
         <Select
@@ -471,7 +492,7 @@ export function Standings({
             value && value !== choice && navigate(choicePath(value))
           }
         >
-          <SelectTrigger aria-label="Show">
+          <SelectTrigger aria-label="Time period">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -529,15 +550,21 @@ export function Standings({
           ))}
         </ToggleGroup>
       </div>
-      {data === null ? (
+      {data === null && !failed ? (
         <Empty className="py-32">
           <EmptyDescription>
-            No standings for {choice === CURRENT ? "the last year" : choice}{" "}
+            No rankings for {choice === CURRENT ? "the past 12 months" : choice}{" "}
             yet.
           </EmptyDescription>
         </Empty>
       ) : view === "posters" ? (
         <Posters movies={posters} />
+      ) : failed ? (
+        <Empty className="py-32">
+          <EmptyDescription>
+            Couldn’t load the chart. Try Posters, or reload the page.
+          </EmptyDescription>
+        </Empty>
       ) : (
         <div
           ref={wrapRef}
@@ -567,7 +594,7 @@ export function Standings({
             <ol
               aria-label={
                 data?.current
-                  ? "The best movies of the past year"
+                  ? "The best movies of the past 12 months"
                   : `The best movies of ${data?.data.year}`
               }
               className="absolute"

@@ -82,21 +82,16 @@ export function getYears(): number[] {
   )
 }
 
-/** A year's movies, best first, as its page lists them. */
+/** A year's list (best-pictures-YYYY.json), best first, as its page lists it. */
 export async function getYearList(year: number) {
-  const [{ ridges }, { catalog }] = await Promise.all([
-    getYear(year),
-    getHistory(),
-  ])
-  return ridges
-    .toSorted((a, b) => a.rank - b.rank)
-    .map((ridge) => ({
-      id: Number(ridge.id),
-      title: ridge.title,
-      poster_url: catalog[ridge.id]?.poster_url ?? null,
-      genres: catalog[ridge.id]?.genres ?? [],
-      href: moviePath(ridge),
-    }))
+  const list = (await load<ListMovie[]>(`best-pictures-${year}.json`)) ?? []
+  return list.map((movie) => ({
+    id: movie.tmdb_id,
+    title: movie.title,
+    poster_url: movie.poster_url ?? null,
+    genres: movie.genres,
+    href: moviePath({ id: movie.tmdb_id, title: movie.title }),
+  }))
 }
 
 export interface MovieSummary extends CatalogMovie {

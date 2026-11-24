@@ -11,6 +11,7 @@ import { buttonVariants } from "@/components/ui/button"
 import { SITE } from "@/consts"
 import Layout from "@/layouts/base.astro"
 import { getYears } from "@/lib/movies"
+import { Braces } from "lucide-react"
 import { siGithub } from "simple-icons"
 
 interface Props {
@@ -25,6 +26,8 @@ interface Props {
 const { title, description, choice, listed, listName } = Astro.props
 
 const years = getYears()
+const json =
+  choice === "current" ? "/best-pictures.json" : `/best-pictures-${choice}.json`
 
 const jsonLd = [
   {
@@ -55,12 +58,18 @@ const jsonLd = [
       <p class="mt-4 text-xl font-medium text-balance text-muted-foreground sm:text-2xl">
         {description}
       </p>
+      <!-- The page's own list file; /about/#feeds has them all -->
+      <div class="mt-6 flex flex-wrap gap-2">
+        <a href={json} class={buttonVariants({ variant: "outline" })}>
+          <Braces aria-hidden="true" />
+          JSON feed
+        </a>
+        <a href={SITE.code} class={buttonVariants({ variant: "outline" })}>
+          <BrandIcon icon={siGithub} />
+          Source
+        </a>
+      </div>
     </div>
-    <Standings client:load years={years} choice={choice} listed={listed}>
-      <a href={SITE.code} class={buttonVariants({ variant: "outline" })}>
-        <BrandIcon icon={siGithub} />
-        GitHub
-      </a>
-    </Standings>
+    <Standings client:load years={years} choice={choice} listed={listed} />
   </section>
 </Layout>

@@ -5,6 +5,7 @@ import type { Movie } from "../pipeline/lib/types.ts"
 import validateList from "../pipeline/lib/validate.ts"
 import config from "../pipeline/config.ts"
 import { pickTop, standingScores } from "../pipeline/rank.ts"
+import { listYears, yearList } from "../pipeline/lib/years.ts"
 
 const range = (from: number, to: number, step = 1) =>
   Array.from(
@@ -117,9 +118,10 @@ describe("standings", () => {
     )
   })
 
-  it("drops movies that left the pool", () => {
+  it("keeps the last score of movies that left the pool", () => {
     assert.deepEqual(standingScores(movies([1]), { 1: 50 }, { 1: 50, 9: 99 }), {
       1: 50,
+      9: 99,
     })
   })
 
@@ -162,5 +164,57 @@ describe("best-pictures.json", () => {
         }),
       /bad imdb_id/
     )
+  })
+})
+
+describe("year lists", () => {
+  const movie = (release_date: string | null) => ({
+    title: "M",
+    imdb_id: "tt1",
+    poster_url: null,
+    release_date,
+    genres: [],
+    runtime: null,
+    trailer_url: null,
+  })
+  const catalog = {
+    1: movie("2025-12-20"),
+    2: movie("2026-03-01"),
+    3: movie("2026-11-01"),
+    4: movie(null),
+  }
+  const lu = (date: string, ids: number[]) => ({
+    date,
+    ids,
+    source: "stevenlu" as const,
+  })
+
+  it("lists a year's releases over their whole run, by points before scoring began", () => {
+    const rankings = [
+      lu("2025-12-30", [1]),
+      lu("2026-01-05", [1, 2]),
+      lu("2026-01-06", [2, 1]),
+      lu("2026-01-07", [2, 4]),
+    ]
+    assert.deepEqual(yearList(rankings, catalog, {}, 2025), [1])
+    // 4 has no release date, so it counts in the year it was first ranked
+    assert.deepEqual(yearList(rankings, catalog, {}, 2026), [2, 4])
+  })
+
+  it("ranks by standing score from the first year this site scored", () => {
+    const rankings = [
+      lu("2026-03-02", [2]),
+      { date: "2026-11-24", ids: [3, 2] },
+    ]
+    assert.deepEqual(
+      yearList(rankings, catalog, { 2: 70, 3: 90 }, 2026),
+      [3, 2]
+    )
+  })
+
+  it("has a list for every year up to the latest night's", () => {
+    const years = listYears([lu("2026-01-01", [1])])
+    assert.equal(years[0], 2019)
+    assert.equal(years.at(-1), 2026)
   })
 })

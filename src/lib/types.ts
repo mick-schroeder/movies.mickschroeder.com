@@ -52,5 +52,6 @@ export interface CatalogMovie {
 /** data/movies.json, by tmdb id. */
 export type Catalog = Record<string, CatalogMovie>
 
-/** data/scores.json: { [tmdb_id]: standing score } after the latest night. */
+/** data/scores.json: { [tmdb_id]: standing score } after the latest night. A movie
+ * that left the pool keeps its last score, its final verdict. */
 export type Scores = Record<string, number>

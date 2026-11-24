@@ -1,7 +1,7 @@
 ---
 // A movie's year as a joyplot: its ridge inked bold among a few made-up low ridges,
 // there only for the look (later rows in front, its own on top), with its key nights pinned to it.
-// Full page width; rendered at build time.
+// Full page width, stretched to whatever height the page leaves it; rendered at build time.
 import * as d3 from "d3"
 import { getYear, type MovieSummary } from "@/lib/movies"
 import {
@@ -75,7 +75,7 @@ const at = (date: string): [number, number] => {
     inked[Math.min(inked.length - 1, Math.round((utc(date) - start) / DAY))]!
   return [px, base + py]
 }
-// The year is under the chart, so the pins leave it out: "May 17"
+// The year heads the chart, so the pins leave it out: "May 17"
 const day = (date: string) =>
   new Date(utc(date)).toLocaleDateString("en-US", {
     month: "short",
@@ -96,20 +96,20 @@ if (released) {
   })
 }
 if (inYear(firstNight)) {
-  const atBest = bestNight === firstNight ? ` · Best #${best}` : ""
+  const atBest = bestNight === firstNight ? ` · Peak #${best}` : ""
   pins.push({
     date: firstNight,
     label: `Added ${day(firstNight)}${atBest}`,
   })
 }
 if (inYear(bestNight) && bestNight !== firstNight) {
-  pins.push({ date: bestNight, label: `Best #${best}` })
+  pins.push({ date: bestNight, label: `Peak #${best}` })
 }
 if (inYear(lastNight) && lastNight !== firstNight) {
   pins.push(
     current
       ? { date: lastNight, label: `Now #${current}`, accent: true }
-      : { date: lastNight, label: `Last on the list ${day(lastNight)}` }
+      : { date: lastNight, label: `Dropped ${day(lastNight)}` }
   )
 }
 
@@ -180,11 +180,13 @@ const months = d3
 ---
 
 <figure class="movie-joyplot">
+  <figcaption class="year px-4 font-heading font-bold sm:px-6">
+    {year}
+  </figcaption>
   <div class="plot">
     <svg
       viewBox={`0 0 ${W} ${H}`}
       preserveAspectRatio="none"
-      style={`aspect-ratio:${W}/${H}`}
       role="img"
       aria-label={`How high ${movie.title} ranked in ${year}`}
     >
@@ -220,20 +222,36 @@ const months = d3
       <span style={`left:${left}%`}>{label}</span>
     ))}
   </div>
-  <figcaption class="px-4 text-sm font-medium sm:px-6">{year}</figcaption>
 </figure>
 
 <style>
+  /* Fills the height it's given; the drawing stretches to it */
+  .movie-joyplot {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+  }
+  /* The year, quietly heading the chart */
+  .year {
+    margin-top: 2rem;
+    font-size: clamp(1.75rem, 4vw, 2.75rem);
+    line-height: 0.8;
+    letter-spacing: -0.04em;
+    font-variant-numeric: tabular-nums;
+    color: color-mix(in oklab, var(--muted-foreground) 70%, transparent);
+  }
   /* Room above for the pins' labels */
   .plot {
     position: relative;
+    flex: 1;
+    min-height: 220px;
     margin-top: 4.5rem;
   }
   .plot svg {
-    display: block;
+    position: absolute;
+    inset: 0;
     width: 100%;
-    height: auto;
-    min-height: 220px;
+    height: 100%;
   }
   .fill {
     fill: var(--background);

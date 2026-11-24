@@ -1,6 +1,7 @@
 // Writes tonight's data into ./public, where `astro build` publishes it:
 //   best-pictures.json            tonight's standings (Steven Lu's format)
 //   best-pictures-YYYYMMDD.json   the same list, kept under tonight's date
+//   best-pictures-YYYY.json       each year's best movies, rewritten nightly (the year pages)
 //   data/*.json                   the rankings, movie details and scores carried to tomorrow
 //
 // Everything is checked before anything is written, so a bad run
@@ -17,6 +18,7 @@ import * as data from "./lib/data.ts"
 import validateList from "./lib/validate.ts"
 import { backfill } from "./lib/stevenlu.ts"
 import { getMovies, rankMovies } from "./rank.ts"
+import { listYears, yearFilename, yearList } from "./lib/years.ts"
 
 const OUTPUT_DIR = new URL("../public/", import.meta.url)
 
@@ -53,6 +55,18 @@ validateList("best-pictures.json", tonight, {
   requireImdbId: true,
 })
 
+// Every year's list, since a year's movies keep moving while they're still ranked
+const years = listYears(updated.rankings).map((year) => ({
+  name: yearFilename(year),
+  list: data.toList(
+    yearList(updated.rankings, updated.catalog, updated.scores, year),
+    updated.catalog
+  ),
+}))
+for (const { name, list } of years) {
+  validateList(name, list, { requireImdbId: true })
+}
+
 // Everything passed: write it out
 const write = (name: string, value: unknown) =>
   writeFileSync(new URL(name, OUTPUT_DIR), JSON.stringify(value))
@@ -61,12 +75,13 @@ mkdirSync(new URL("data/", OUTPUT_DIR), { recursive: true })
 write(data.FILES.rankings, updated.rankings)
 write(data.FILES.catalog, updated.catalog)
 write(data.FILES.scores, updated.scores)
-for (const { name, list } of lists) write(name, list)
+for (const { name, list } of [...lists, ...years]) write(name, list)
 write("best-pictures.json", tonight)
 
 console.log({
   movies: tonight.length,
   dated_files: lists.length,
+  year_files: years.length,
   history_nights: updated.rankings.length,
   history_movies: Object.keys(updated.catalog).length,
 })

@@ -1,6 +1,6 @@
 # Best Pictures
 
-The best movies of the past year, ranked nightly by our AI editor.
+The best movies of the past 12 months, re-ranked every night by an AI critic.
 
 This started as a fork of [sjlu/popular-movies](https://github.com/sjlu/popular-movies)
 by Steven Lu. `best-pictures.json` keeps **the same JSON format**, so anything that read the
@@ -16,10 +16,11 @@ https://movies.mickschroeder.com/best-pictures.json
 
 ## Files
 
-| File                                                                      | Contents                                                                     |
-| ------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| [best-pictures.json](https://movies.mickschroeder.com/best-pictures.json) | The current standings: 25 movies, best first                                 |
-| `best-pictures-YYYYMMDD.json`                                             | One night's standings in the same format, e.g. `best-pictures-20261123.json` |
+| File                                                                      | Contents                                                                       |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [best-pictures.json](https://movies.mickschroeder.com/best-pictures.json) | The current standings: 25 movies, best first                                   |
+| `best-pictures-YYYYMMDD.json`                                             | One night's standings in the same format, e.g. `best-pictures-20261123.json`   |
+| `best-pictures-YYYY.json`                                                 | The best movies released that year, best first, e.g. `best-pictures-2026.json` |
 
 `best-pictures.json` is a JSON array of:
 
@@ -33,7 +34,11 @@ https://movies.mickschroeder.com/best-pictures.json
 }
 ```
 
-`best-pictures-YYYYMMDD.json` is each night's `best-pictures.json`, kept under its date (UTC) like Steven Lu's `movies-YYYYMMDD.json`. Both formats are the contract and won't change.
+`best-pictures-YYYYMMDD.json` is each night's `best-pictures.json`, kept under its date (UTC) like Steven Lu's `movies-YYYYMMDD.json`.
+
+`best-pictures-YYYY.json` is every movie released that year that has been in the standings, best first, and is what the site's year page shows. It's rewritten nightly, so a year keeps changing while its movies are still ranked (into the next year for late releases). From 2026, when this site began ranking its own, movies are ordered by their standing score, which settles into a final score once a movie is a year old. Earlier years are ordered by their nights in Steven Lu's lists: #1 earns 25 points a night, the last spot 1, totalled over the movie's whole run.
+
+All three formats are the contract and won't change.
 
 Every night from Dec 2, 2019, until this site started ranking its own is backfilled from [Steven Lu's dated lists](https://github.com/sjlu/popular-movies#usage) (15 recent movies, his order; lists before 2023 have only IMDb ids, so TMDB ids are looked up). Nights missing from his archive (for example Oct 25, 2025–Jan 21, 2026 and Mar 11–May 24, 2026) have no file. The backfill runs once, on the first run with `--new-history`.
 
@@ -41,11 +46,11 @@ Every night from Dec 2, 2019, until this site started ranking its own is backfil
 
 The site keeps its own working data under `data/`. It isn't a contract and may change; use the files above instead.
 
-| File                 | Contents                                                                                                               |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `data/rankings.json` | Every night's TMDB ids, best first, oldest night first; Steven Lu's nights have `"source": "stevenlu"`                 |
-| `data/movies.json`   | Every movie that has been in the standings, by TMDB id: title, IMDb id, poster, release date, genres, runtime, trailer |
-| `data/scores.json`   | Each eligible movie's standing score after the latest night, which tomorrow's ranking starts from                      |
+| File                 | Contents                                                                                                                            |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `data/rankings.json` | Every night's TMDB ids, best first, oldest night first; Steven Lu's nights have `"source": "stevenlu"`                              |
+| `data/movies.json`   | Every movie that has been in the standings, by TMDB id: title, IMDb id, poster, release date, genres, runtime, trailer              |
+| `data/scores.json`   | Each movie's standing score after the latest night, which tomorrow's ranking starts from; a movie that left the pool keeps its last |
 
 ## How it works
 
@@ -66,8 +71,8 @@ infra/      AWS stack: S3 + CloudFront + GitHub OIDC role
    - Rank - Each movie's standing score becomes 25% tonight's score and 75% last night's
      standing (`SMOOTHING` in `pipeline/config.ts`); a new movie starts at its first score. The top 25
      are tonight's standings.
-   - Write - Checks everything, then writes `best-pictures.json`, tonight's `best-pictures-YYYYMMDD.json` and `data/` to `public/`.
-2. `pnpm build` builds the site into `dist/`: the current standings (`/`), a page for each year (`/year/{year}/`), and a page for
+   - Write - Checks everything, then writes `best-pictures.json`, tonight's `best-pictures-YYYYMMDD.json`, every `best-pictures-YYYY.json` and `data/` to `public/`.
+2. `pnpm build` builds the site into `dist/`: the current standings (`/`), a page for each year (`/year/{year}/`) and one listing them (`/year/`), an about page with the JSON feeds (`/about/`), and a page for
    every movie that has been in the standings (`/title/{tmdb_id}-{title}/`): its year as a short joyplot of the movies that joined around it, its own ridge in bold
    and its release, first, best and latest nights pinned on it, plus links to TMDB, IMDb, Letterboxd, MDBList, Rotten Tomatoes, Metacritic and Trakt.
    Without `public/best-pictures.json` (local dev, CI) it uses the live file instead.

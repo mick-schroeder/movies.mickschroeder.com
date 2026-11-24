@@ -12,7 +12,7 @@ const years = await Promise.all(
     movies: (await getYearList(year)).slice(0, TOP),
   }))
 )
-const description = "The best movies of every year, ranked by our AI editor."
+const description = "The best movies of every year, ranked by an AI critic."
 const jsonLd = [
   {
     "@type": "ItemList",

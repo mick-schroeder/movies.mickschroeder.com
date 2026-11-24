@@ -1,6 +1,6 @@
 # Best Pictures
 
-> The best movies of the past year, ranked nightly by our AI editor. Built from TMDB and MDBList data. Poll at most once a day.
+> The best movies of the past 12 months, re-ranked every night by an AI critic. Built from TMDB and MDBList data. Poll at most once a day.
 
 Each night AI scores every movie released in the last 365 days (0-100, how strongly it would recommend it). A movie's standing score is a running average of its nightly scores, and the top 25 are the standings.
 
@@ -12,10 +12,12 @@ Each night AI scores every movie released in the last 365 days (0-100, how stron
   - `imdb_id` (string like `tt1234567`)
   - `poster_url` (string URL to a TMDB poster image)
   - `genres` (array of snake_case strings, e.g. `science_fiction`)
+- `https://movies.mickschroeder.com/best-pictures-YYYY.json` (e.g. `best-pictures-2025.json`): the best movies released that calendar year, best first, in the same format, from 2019 on. The year pages list these.
 - `https://movies.mickschroeder.com/best-pictures-YYYYMMDD.json`: one night's standings in the same format, like Steven Lu's dated `movies-YYYYMMDD.json`, e.g. `best-pictures-20261123.json` (dates are UTC). Files exist from Dec 2, 2019. Nights before this site ranked its own are [Steven Lu's popular-movies](https://github.com/sjlu/popular-movies) lists (15 recent movies, his order); some nights are missing.
 
 ## Optional
 
+- `https://movies.mickschroeder.com/about/`: how the ranking works, and every JSON feed
 - `https://movies.mickschroeder.com/year/{year}/` (e.g. `/year/2025/`): every movie ranked that calendar year, best first, from 2019 on
 - `https://movies.mickschroeder.com/title/{tmdb_id}-{title}/` (e.g. `/title/1368337-the-odyssey/`): a page for every movie that has been in the standings, with its nightly ranks and links to TMDB, IMDb, Letterboxd, MDBList and others
 

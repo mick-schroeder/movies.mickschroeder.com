@@ -6,6 +6,6 @@ Astro + shadcn site with a nightly data pipeline. See README.md for layout and c
 - Keep it simple: stock Astro and shadcn features over custom code; React islands only for interactivity.
 - Add shadcn components with `pnpm dlx shadcn@latest add`; don't edit `src/components/ui/` by hand.
 - Use the `astro-docs` and `shadcn` MCP servers to check current APIs instead of guessing.
-- `best-pictures.json` and `best-pictures-YYYYMMDD.json` keep Steven Lu's popular-movies format, a public contract (`ListMovie` in `src/lib/types.ts`); don't change it. `data/*.json` is the site's own working data and can change.
+- `best-pictures.json`, `best-pictures-YYYYMMDD.json` and `best-pictures-YYYY.json` keep Steven Lu's popular-movies format, a public contract (`ListMovie` in `src/lib/types.ts`); don't change it. The home page lists `best-pictures.json` and each year page its `best-pictures-YYYY.json`, exactly. `data/*.json` is the site's own working data and can change.
 - `pipeline/` and `test/` run under Node type stripping: erasable TypeScript only, imports end in `.ts`.
 - `src/components/site/` holds pieces meant to be shared with other sites; keep them site-agnostic.

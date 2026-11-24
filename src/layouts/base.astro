@@ -22,11 +22,36 @@ const { hideTitle = false, ...head } = Astro.props
     <BaseHead {...head} />
     <ClientRouter />
   </head>
-  <body class="flex min-h-svh flex-col antialiased">
-    <SiteHeader hideTitle={hideTitle} />
-    <main class="flex-1">
-      <slot />
-    </main>
+  <body class="antialiased">
+    <!-- App-like: the page fills one screen, with the footer below it -->
+    <div class="flex min-h-svh flex-col">
+      <SiteHeader hideTitle={hideTitle}>
+        <nav aria-label="Site">
+          <ul class="flex gap-4 text-sm text-muted-foreground">
+            {[
+              { name: "Current", href: "/" },
+              { name: "By year", href: "/year/" },
+              { name: "About", href: "/about/" },
+            ].map(({ name, href }) => (
+              <li>
+                <a
+                  href={href}
+                  class="hover:text-foreground aria-[current=page]:text-foreground"
+                  aria-current={
+                    Astro.url.pathname === href ? "page" : undefined
+                  }
+                >
+                  {name}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </SiteHeader>
+      <main class="flex flex-1 flex-col">
+        <slot />
+      </main>
+    </div>
     <div class="px-4 sm:px-6">
       <SiteFooter code={SITE.code}>
         <div class="flex flex-col gap-2">
