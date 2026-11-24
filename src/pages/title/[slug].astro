@@ -91,6 +91,9 @@ const jsonLd = [
   description={`${movie.title}${releaseYear ? ` (${releaseYear})` : ""}, one of the best movies of the year, ranked by our AI editor.`}
   jsonLd={jsonLd}
 >
+  {(movie.backdrop_url ?? movie.poster_url) && (
+    <img src={movie.backdrop_url ?? movie.poster_url} alt="" class="backdrop" />
+  )}
   <section class="overflow-hidden">
     <div class="flex items-start gap-4 px-4 pt-10 pb-8 sm:gap-6 sm:px-6 sm:pt-14">
       {movie.poster_url && (

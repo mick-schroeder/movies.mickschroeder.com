@@ -83,6 +83,7 @@ export async function backfill(
       title: details.title,
       imdb_id: details.imdb_id || imdbId,
       poster_url: tmdb.posterUrl(details.poster_path),
+      backdrop_url: tmdb.backdropUrl(details.backdrop_path),
       release_date: details.release_date || null,
       genres: tmdb.genreSlugs(details),
       runtime: details.runtime || null,

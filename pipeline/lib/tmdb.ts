@@ -10,6 +10,7 @@ interface TmdbMovie {
   vote_average: number
   vote_count: number
   poster_path: string | null
+  backdrop_path: string | null
 }
 
 interface TmdbPage {
@@ -22,6 +23,7 @@ export interface TmdbDetails {
   title: string
   imdb_id: string | null
   poster_path: string | null
+  backdrop_path: string | null
   release_date?: string
   revenue: number
   runtime: number | null
@@ -62,6 +64,8 @@ async function request<T>(
 
 export const posterUrl = (path: string | null) =>
   path ? config.TMDB_POSTER_URL + path : null
+export const backdropUrl = (path: string | null) =>
+  path ? config.TMDB_BACKDROP_URL + path : null
 
 // "Science Fiction" -> "science_fiction"
 export const genreSlugs = (details: TmdbDetails) =>
@@ -92,6 +96,7 @@ const formatMovie = (movie: TmdbMovie): Movie => ({
   vote_average: movie.vote_average,
   vote_count: movie.vote_count,
   poster_url: posterUrl(movie.poster_path),
+  backdrop_url: backdropUrl(movie.backdrop_path),
 })
 
 const isoDate = (date: Date) => date.toISOString().slice(0, 10)

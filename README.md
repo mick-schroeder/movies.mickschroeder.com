@@ -1,6 +1,6 @@
 # Best Pictures
 
-The best movies of the past year, ranked by our AI editor.
+The best movies of the past year, ranked nightly by our AI editor.
 
 This started as a fork of [sjlu/popular-movies](https://github.com/sjlu/popular-movies)
 by Steven Lu. `best-pictures.json` keeps **the same JSON format**, so anything that read the

@@ -93,86 +93,110 @@
     @apply font-sans;
   }
 }
-/* Standings chart (src/components/standings.tsx), drawn by d3 */
+/* A movie's backdrop (a wide still from TMDB, or its poster when it has none)
+   behind the page, black and white and faint, fixed at the
+   window's top right and fading out to the left and down: the highlighted
+   movie on the standings, the movie itself on its page. Everything with a
+   black fill (the ridges, the title plates) sits over it, so it shows through
+   the gaps between the lines. Swapped instantly, never animated. */
+@layer components {
+  .backdrop {
+    position: fixed;
+    top: 0;
+    right: 0;
+    z-index: -1;
+    width: min(70vw, 56rem);
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    object-position: center 25%;
+    opacity: 0.28;
+    filter: grayscale(1) contrast(1.2);
+    pointer-events: none;
+    mask-image:
+      linear-gradient(to right, transparent, #000 55%),
+      linear-gradient(to bottom, #000 35%, transparent);
+    mask-composite: intersect;
+  }
+}
+
+/* Standings chart (src/components/standings.tsx), drawn by d3, with its
+   titles as an HTML list over the left edge. Nothing moves: a highlight is
+   instant and keeps every ridge in its place. */
 @layer components {
   .standings-chart svg {
     display: block;
   }
-  /* Focus shows as the same highlight as hover */
-  .standings-chart .ridge:focus-visible {
-    outline: none;
+  /* The chart's one pointer handler picks the ridge; no mark takes events */
+  .standings-chart svg * {
+    pointer-events: none;
   }
   .standings-chart .ridge path {
-    fill: var(--background);
     stroke: var(--foreground);
     stroke-width: 1.4;
     stroke-linejoin: round;
-    stroke-linecap: round;
+  }
+  .standings-chart .ridge path.fill {
+    fill: var(--background);
+    stroke: none;
+  }
+  .standings-chart .ridge path.line {
+    fill: none;
   }
   .standings-chart .ridge .release {
     fill: var(--foreground);
   }
-  .standings-chart .ridge.on path {
+  .standings-chart .ridge.on path.line {
     stroke: var(--primary);
     stroke-width: 2.5;
-  }
-  .standings-chart .ridge path.fill {
-    stroke: none;
-  }
-  /* Fills stay opaque while highlighting, so ridges still hide the rows behind:
-     a dark emerald tint under the highlighted line, the other lines dimmed */
-  .standings-chart .ridge.on path.fill {
-    fill: color-mix(in oklch, var(--primary) 18%, var(--background));
-  }
-  .standings-chart .ridges:has(.on) .ridge:not(.on) {
-    --dim: color-mix(in oklch, var(--foreground) 40%, var(--background));
-    path {
-      stroke: var(--dim);
-    }
-    .release {
-      fill: var(--dim);
-    }
   }
   .standings-chart .ridge.on .release {
     fill: var(--primary);
   }
-  .standings-chart .label rect {
-    fill: var(--background);
-  }
-  .standings-chart .label text {
-    fill: var(--muted-foreground);
-  }
-  .standings-chart .ridge.on .label text {
-    fill: var(--primary);
-    font-weight: 600;
+  /* The highlighted line's parts hidden behind the rows in front, faintly */
+  .standings-chart .ghost {
+    fill: none;
+    stroke: var(--primary);
+    stroke-width: 1;
+    opacity: 0.45;
   }
   .standings-chart .month {
     fill: var(--muted-foreground);
     font-size: 12px;
   }
 
-  /* A black cover that slides off to the right once: only a transform animates */
-  .sweep {
-    position: absolute;
-    inset: 0 auto 0 0;
-    width: calc(100% + 240px);
-    background: linear-gradient(90deg, transparent, var(--background) 240px);
-    pointer-events: none;
-    animation: sweep 1.8s cubic-bezier(0.3, 0.6, 0.2, 1) both;
-    will-change: transform;
+  /* A title is a full-row link; its rank and title sit on black plates so the
+     ridge line runs behind them */
+  .standings-title {
+    display: flex;
+    height: 100%;
+    align-items: center;
+    line-height: 1.2;
+    outline: none;
   }
-  @media (prefers-reduced-motion: reduce) {
-    .sweep {
-      display: none;
-    }
+  .standings-title span {
+    background: var(--background);
   }
-}
-
-@keyframes sweep {
-  from {
-    transform: translateX(-240px);
+  .standings-title .rank {
+    width: calc(2ch + 0.5em);
+    flex-shrink: 0;
+    padding-right: 0.5em;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted-foreground);
   }
-  to {
-    transform: translateX(100%);
+  .standings-title .title {
+    overflow: hidden;
+    padding-right: 0.5em;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .standings-title.on .rank,
+  .standings-title.on .title {
+    color: var(--primary);
+  }
+  .standings-title:focus-visible .title {
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
 }

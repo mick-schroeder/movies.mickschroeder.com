@@ -13,6 +13,7 @@ export default {
   SITE_URL: env("SITE_URL", "https://movies.mickschroeder.com"),
 
   TMDB_POSTER_URL: "https://image.tmdb.org/t/p/w500",
+  TMDB_BACKDROP_URL: "https://image.tmdb.org/t/p/w780",
   ANTHROPIC_EFFORT: "medium",
 
   // Rolling window: movies released (TMDB release date) in the last this many days

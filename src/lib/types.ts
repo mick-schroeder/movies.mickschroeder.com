@@ -37,6 +37,9 @@ export interface CatalogMovie {
   title: string
   imdb_id: string
   poster_url: string | null
+  /** A wide, text-free still for page backgrounds; missing on movies last
+   * ranked before these were kept. */
+  backdrop_url?: string | null
   release_date: string | null
   genres: string[]
   /** In minutes. */

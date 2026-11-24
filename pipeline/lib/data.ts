@@ -66,10 +66,12 @@ export function addNight(
   for (const movie of movies) {
     const { tmdb_id, title, imdb_id, poster_url, release_date } = movie
     const { genres = [], runtime = null, trailer_url = null, links } = movie
+    const { backdrop_url = null } = movie
     catalog[tmdb_id!] = {
       title,
       imdb_id: imdb_id!,
       poster_url,
+      backdrop_url,
       release_date,
       genres,
       runtime,
@@ -107,6 +109,8 @@ const schema = z.object({
       title: z.string().min(1),
       imdb_id: z.string().regex(/^tt\d+$/),
       poster_url: z.string().nullable(),
+      // Missing on movies last ranked before backdrops were kept
+      backdrop_url: z.string().nullable().optional(),
       release_date: z.iso.date().nullable(),
       genres: z.array(z.string()),
       runtime: z.int().positive().nullable(),

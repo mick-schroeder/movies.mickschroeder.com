@@ -11,6 +11,8 @@ export interface Movie {
   vote_average?: number
   vote_count?: number
   poster_url: string | null
+  /** A wide, text-free still, for page backgrounds. */
+  backdrop_url?: string | null
   tmdb_id?: number
   imdb_id?: string | null
   revenue?: number | null

@@ -4,7 +4,13 @@ import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { FIRST_YEAR, SITE } from "@/consts"
 import { moviePath } from "@/lib/links"
-import { type Ridge, ridges, yearOf, yearSpan } from "@/lib/ridgeline"
+import {
+  RUNOUT_DAYS,
+  type Ridge,
+  ridges,
+  yearOf,
+  yearSpan,
+} from "@/lib/ridgeline"
 import type { Catalog, CatalogMovie, ListMovie, RankDay } from "@/lib/types"
 
 /** A published file, or null if neither public/ nor the live site has it. */
@@ -48,7 +54,8 @@ const years = new Map<number, Promise<YearRidges>>()
 export interface YearRidges {
   start: number
   end: number
-  /** Every movie ranked that year, in the order they joined. */
+  /** Every movie ranked that year, in the order they joined, each ridge
+   * running RUNOUT_DAYS past the end. */
   ridges: Ridge[]
 }
 /** A year's ridges, worked out once for every movie page that shows the year. */
@@ -59,7 +66,7 @@ export function getYear(year: number): Promise<YearRidges> {
       getHistory().then(({ rankings, catalog }) => {
         const data = yearOf(rankings, catalog, year)
         const { start, end } = yearSpan(data)
-        return { start, end, ridges: ridges(data, start, end) }
+        return { start, end, ridges: ridges(data, start, end, RUNOUT_DAYS) }
       })
     )
   }

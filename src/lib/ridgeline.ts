@@ -2,7 +2,7 @@
 // A ridge's height each night is how high the movie ranked (#1 tallest, off the list
 // flat; squared so the top spots stand out, with a floor so every ranked night
 // shows), smoothed over about two weeks so nightly wobbles don't show.
-import { bisector, randomLcg } from "d3"
+import { area, bisector, curveBasis, line, randomLcg, range, sum } from "d3"
 import { LIST_SIZE as MAX_RANK } from "@/consts"
 import type { Catalog, RankDay } from "@/lib/types"
 
@@ -12,19 +12,59 @@ const MAX_GAP_DAYS = 3
 // The height of the lowest rank, as a share of #1's
 const FLOOR = 0.08
 export const DAY = 86400000
+// Days after the last night where a ridge eases down to flat, so a movie still
+// ranked doesn't run off the chart's edge at full height
+export const RUNOUT_DAYS = 14
 
 const height = (rank: number | undefined) =>
   rank ? FLOOR + (1 - FLOOR) * ((MAX_RANK + 1 - rank) / MAX_RANK) ** 2 : 0
 
 // Each line wobbles a little, like it was inked by hand. The wobble is fixed per
-// movie and baked into the shape, so it costs nothing to draw or animate.
+// movie and follows its place across the chart, not the pixel, so it stretches
+// with the page instead of shifting when the width changes.
 const WOBBLE_PX = 0.9
-export function wobble(id: string) {
-  const rand = randomLcg(Number(id) || 1)
+function wobble(id: string) {
+  const rand = randomLcg(sum(id, (c) => c.charCodeAt(0)) / 997)
   const [a, b] = [rand() * 2 * Math.PI, rand() * 2 * Math.PI]
-  return (px: number) =>
-    WOBBLE_PX * (0.6 * Math.sin(px * 0.05 + a) + 0.4 * Math.sin(px * 0.13 + b))
+  return (u: number) =>
+    WOBBLE_PX * (0.6 * Math.sin(u * 50 + a) + 0.4 * Math.sin(u * 130 + b))
 }
+
+/** A point of a drawn ridge: [x, y, baseline y], in pixels from its row's baseline. */
+export type RidgePoint = [x: number, y: number, base: number]
+
+/**
+ * A ridge as drawn, edge to edge: flat from 0 in to its first point, then its
+ * shape ([x, height] in pixels, up from the baseline), then flat out to `to`.
+ * The wobble is baked into the line and its baseline, so a fill has a
+ * hand-inked bottom edge too. Shared by the standings chart and the movie pages.
+ */
+export function handInked(
+  id: string,
+  shape: [number, number][],
+  to: number
+): RidgePoint[] {
+  const shake = wobble(id)
+  const first = shape[0]?.[0] ?? to
+  const last = shape.at(-1)?.[0] ?? to
+  return [
+    ...range(0, first, 20).map((px): [number, number] => [px, 0]),
+    ...shape,
+    ...(last < to ? [...range(last + 20, to, 20), to] : []).map(
+      (px): [number, number] => [px, 0]
+    ),
+  ].map(([px, h]) => {
+    const dy = shake(px / to)
+    return [px, dy - h, dy]
+  })
+}
+export const ridgeLine = line<RidgePoint>()
+  .y((p) => p[1])
+  .curve(curveBasis)
+export const ridgeArea = area<RidgePoint>()
+  .y0((p) => p[2])
+  .y1((p) => p[1])
+  .curve(curveBasis)
 
 /** What a chart draws: some nights' standings and the movies in them. */
 export interface ChartData {
@@ -69,21 +109,23 @@ function nightOn(nights: RankDay[], t: number): string | null {
 }
 
 // One movie's ridge: [time, height 0-1] for every day of the year, smoothed.
-// Days with no standings are flat.
+// Days with no standings are flat, and so are any run-out days after the end.
 export function ridgeline(
   byDate: Record<string, number>,
   nights: RankDay[],
   start: number,
-  end: number
+  end: number,
+  runout = 0
 ): [number, number][] {
   const heights: number[] = []
-  for (let t = start; t < end; t += DAY) {
-    const night = nightOn(nights, t)
+  for (let t = start; t < end + runout * DAY; t += DAY) {
+    const night = t < end && nightOn(nights, t)
     heights.push(night ? height(byDate[night]) : 0)
   }
 
   // A triangle-weighted average, so a jump rises with rounded shoulders. The
-  // window narrows toward either end, so the latest night shows as it is.
+  // window narrows toward either end, so without a run-out the latest night
+  // shows as it is; with one, the ridge rounds off into it.
   const half = Math.floor(SMOOTH_DAYS / 2)
   return heights.map((_, i) => {
     const h = Math.min(half, i, heights.length - 1 - i)
@@ -94,7 +136,12 @@ export function ridgeline(
 }
 
 // Rows in the order movies joined the standings
-export function ridges(data: ChartData, start: number, end: number): Ridge[] {
+export function ridges(
+  data: ChartData,
+  start: number,
+  end: number,
+  runout = 0
+): Ridge[] {
   const latest = data.days.at(-1)?.ids ?? []
   const ranks: Record<string, Record<string, number>> = {}
   const order: string[] = []
@@ -125,7 +172,7 @@ export function ridges(data: ChartData, start: number, end: number): Ridge[] {
       nights: nightRanks.length,
       last: latest.includes(Number(id)) ? latest.indexOf(Number(id)) + 1 : null,
       rank: standing.indexOf(id) + 1,
-      points: ridgeline(ranks[id]!, data.days, start, end),
+      points: ridgeline(ranks[id]!, data.days, start, end, runout),
     }
   })
 }

@@ -1,6 +1,6 @@
 # Best Pictures
 
-> The best movies of the past year, ranked by our AI editor. Built from TMDB and MDBList data. Updated nightly; poll at most once a day.
+> The best movies of the past year, ranked nightly by our AI editor. Built from TMDB and MDBList data. Poll at most once a day.
 
 Each night AI scores every movie released in the last 365 days (0-100, how strongly it would recommend it). A movie's standing score is a running average of its nightly scores, and the top 25 are the standings.
 

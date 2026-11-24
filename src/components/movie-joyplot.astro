@@ -4,7 +4,14 @@
 // Full page width; rendered at build time.
 import * as d3 from "d3"
 import { getYear, type MovieSummary } from "@/lib/movies"
-import { DAY, utc, wobble } from "@/lib/ridgeline"
+import {
+  DAY,
+  handInked,
+  ridgeArea,
+  ridgeLine,
+  RUNOUT_DAYS,
+  utc,
+} from "@/lib/ridgeline"
 
 interface Props {
   movie: MovieSummary
@@ -27,8 +34,8 @@ const PEAK = 56
 const BOLD = 1.3
 const TOP = PEAK * BOLD + 12
 const H = TOP + (ROWS - 1) * GAP + 6
-const x = d3.scaleUtc([start, end], [0, W])
-const line = d3.line().curve(d3.curveBasis)
+// Past the last night, a short run-out where every line eases down to flat
+const x = d3.scaleUtc([start, end + RUNOUT_DAYS * DAY], [0, W])
 
 // A gentle low ridge, the same for this movie on every build: a couple of slow
 // swells, never more than a fifth of a real peak
@@ -54,18 +61,20 @@ const mine = ridge.points.map(([t, h]): [number, number] => [x(t), h * BOLD])
 const rows = d3.range(ROWS).map((i) => {
   const on = i === CONTEXT
   const base = TOP + i * GAP
-  const shake = wobble(on ? id : `${id}-${i}`)
   const shape = (on ? mine : madeUp(`${id}-${i}`)).map(
-    ([px, h]): [number, number] => [px, base - h * PEAK + shake(px)]
+    ([px, h]): [number, number] => [px, h * PEAK]
   )
-  const area = `${line(shape)}L${W},${base + 3}L0,${base + 3}Z`
-  return { on, shape, area, ink: line(shape)! }
+  const points = handInked(on ? id : `${id}-${i}`, shape, W)
+  return { on, base, points, area: ridgeArea(points)!, ink: ridgeLine(points)! }
 })
-const inked = rows[CONTEXT]!.shape
+const { base, points: inked } = rows[CONTEXT]!
 
 // Pins on its ridge: released, first ranked, best, and now or last ranked
-const at = (date: string) =>
-  inked[Math.min(inked.length - 1, Math.round((utc(date) - start) / DAY))]!
+const at = (date: string): [number, number] => {
+  const [px, py] =
+    inked[Math.min(inked.length - 1, Math.round((utc(date) - start) / DAY))]!
+  return [px, base + py]
+}
 // The year is under the chart, so the pins leave it out: "May 17"
 const day = (date: string) =>
   new Date(utc(date)).toLocaleDateString("en-US", {
@@ -77,7 +86,10 @@ const inYear = (date: string | null): date is string =>
   !!date?.startsWith(`${year}-`)
 const { release_date, firstNight, bestNight, lastNight, best, current } = movie
 const pins: { date: string; label: string; accent?: boolean }[] = []
-if (inYear(release_date) && utc(release_date) < end) {
+const released = inYear(release_date) && utc(release_date) < end
+// A dot on its baseline at the release, as on the standings chart
+const releaseX = released ? x(utc(release_date)) : null
+if (released) {
   pins.push({
     date: release_date,
     label: `Released ${day(release_date)}`,
@@ -179,10 +191,13 @@ const months = d3
       {/* Its own ridge drawn last, so no row covers it */}
       {rows
         .toSorted((a, b) => +a.on - +b.on)
-        .map(({ on, area, ink }) => (
-          <g class:list={[on && "on"]}>
+        .map(({ on, base, area, ink }) => (
+          <g class:list={[on && "on"]} transform={`translate(0,${base})`}>
             <path class="fill" d={area} />
             <path class="ink" d={ink} />
+            {on && releaseX !== null && (
+              <path class="release" d={`M${releaseX},0h0`} />
+            )}
           </g>
         ))}
     </svg>
@@ -228,6 +243,14 @@ const months = d3
     stroke: var(--muted-foreground);
     stroke-width: 1;
     stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+  }
+  /* A zero-length round-capped stroke, so the stretched drawing keeps it round */
+  /* Sized against the bold ridge line as the chart's dots are against theirs */
+  .release {
+    stroke: var(--foreground);
+    stroke-width: 6.5;
+    stroke-linecap: round;
     vector-effect: non-scaling-stroke;
   }
   .on .ink {

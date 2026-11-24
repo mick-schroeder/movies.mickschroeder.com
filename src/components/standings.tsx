@@ -1,8 +1,10 @@
 // The year's standings, as a chart or as posters, under one set of filters.
 // The chart is a ridgeline, one ridge per movie (data/rankings.json), drawn
-// edge to edge like a hand-inked plot. A ridge's height each night is how high the movie
-// ranked (#1 tallest, off the list flat; squared so the top spots stand out), smoothed
-// over two weeks so nightly wobbles don't show. Later rows are drawn on top.
+// edge to edge. A ridge's height each night is how high the movie ranked (#1
+// tallest, off the list flat; squared so the top spots stand out), smoothed over
+// two weeks so nightly wobbles don't show, easing flat after the last night.
+// Later rows are drawn in front. The titles are an HTML list of links over the
+// chart's left edge, one per row.
 import * as d3 from "d3"
 import { cn } from "cn"
 import { navigate } from "astro:transitions/client"
@@ -13,7 +15,7 @@ import {
   LayoutGrid,
 } from "lucide-react"
 import {
-  Fragment,
+  type MouseEvent,
   type ReactNode,
   useEffect,
   useMemo,
@@ -26,11 +28,6 @@ import { Empty, EmptyDescription } from "@/components/ui/empty"
 import { Button } from "@/components/ui/button"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -41,11 +38,14 @@ import {
   type ChartData,
   DAY,
   formatDate,
+  handInked,
   pastYear,
   type Ridge,
+  ridgeArea,
+  ridgeLine,
   ridges,
+  RUNOUT_DAYS,
   utc,
-  wobble,
   yearOf,
   yearSpan,
 } from "@/lib/ridgeline"
@@ -56,30 +56,17 @@ import { genreLabel } from "@/lib/utils"
 import type { Catalog, RankDay } from "@/lib/types"
 
 /**
- * Row spacing, title size, title column width, longest title (in characters) and
- * how many rows tall a #1 ridge stands, at Tailwind's breakpoints (sm 640, lg 1024,
- * xl 1280). Phones get a narrower column and shorter titles; wide screens taller
- * peaks, so the ridges don't look stretched.
+ * Row spacing, title size, title column width and page gutter, at Tailwind's
+ * breakpoints (sm 640, lg 1024). Rows are at least 24px apart, so every title
+ * is an easy target.
  */
 function sizes(width: number) {
-  if (width >= 1280)
-    return { row: 14, font: 13, column: 220, chars: 30, peak: 12 }
-  if (width >= 1024)
-    return { row: 13, font: 12, column: 205, chars: 30, peak: 10 }
-  if (width >= 640)
-    return { row: 12, font: 11, column: 190, chars: 30, peak: 9 }
-  return { row: 10, font: 9, column: 105, chars: 22, peak: 9 }
+  if (width >= 1024) return { row: 26, font: 16, column: 300, gutter: 24 }
+  if (width >= 640) return { row: 24, font: 15, column: 260, gutter: 24 }
+  return { row: 24, font: 14, column: 150, gutter: 16 }
 }
-
-// The highlighted ridge comes to the front so its whole shape shows
-function highlight(chart: HTMLElement, id: string | null) {
-  const all = d3
-    .select(chart)
-    .selectAll<SVGAElement, Ridge>(".ridge")
-    .classed("on", (d) => d.id === id)
-  if (id === null) all.sort((a, b) => a.row - b.row)
-  else all.filter(".on").raise()
-}
+// How many rows tall a #1 ridge stands
+const PEAK = 5
 
 // How the rows can be ordered, top to bottom
 const ORDERS = {
@@ -131,7 +118,7 @@ function rows({ data, current }: View, order: Order, reversed = false) {
   const { start, end } = current
     ? { start: utc(latest!.date) - 364 * DAY, end: utc(latest!.date) + DAY }
     : yearSpan(data)
-  const movies = ridges(data, start, end)
+  const movies = ridges(data, start, end, RUNOUT_DAYS)
     .filter((movie) => !current || movie.last !== null)
     // The current view ranks by the latest night's list; a year by its points
     .map((movie) => (current ? { ...movie, rank: movie.last! } : movie))
@@ -140,70 +127,39 @@ function rows({ data, current }: View, order: Order, reversed = false) {
   return { start, end, movies }
 }
 
-function draw(
-  view: View,
-  order: Order,
-  reversed: boolean,
-  chart: HTMLElement,
-  onHover: (ridge: Ridge | null) => void
-) {
-  const { data, current } = view
+// Where everything goes at this width
+type Layout = ReturnType<typeof layout>
+function layout(view: View, order: Order, reversed: boolean, width: number) {
   const { start, end, movies } = rows(view, order, reversed)
+  const size = sizes(width)
+  const top = size.row * PEAK
+  const height = top + (movies.length - 1) * size.row + 40
+  // The titles' column at the left; the ridges' days after it
+  const x = d3.scaleUtc(
+    [start, end + RUNOUT_DAYS * DAY],
+    [size.gutter + size.column + 12, width - 12]
+  )
+  return { start, end, movies, ...size, top, height, width, x }
+}
 
-  const width = chart.clientWidth
-  const { row, font, column, chars, peak } = sizes(width)
-  const top = row * peak
-  const bottom = 40
-  const height = top + (movies.length - 1) * row + bottom
-  // Titles in a column at the left edge; the latest night just inside the right
-  const labelX = 12
-  // Sorted by rank, each title leads with it ("12. ")
-  const ranked = order === "rank"
-  const rankWidth = ranked ? font * 0.6 * (String(movies.length).length + 1) : 0
-  const x = d3.scaleUtc([start, end], [labelX + rankWidth + column, width - 12])
-  // Each ridge in pixels, wobble included: [x, y above its baseline]. Every line
-  // runs in flat from the left edge (through its title) and carries on at its
-  // latest height to the right edge.
-  const step = (from: number, to: number) =>
-    Array.from({ length: Math.max(0, Math.ceil((to - from) / 20)) }, (_, i) =>
-      Math.min(from + i * 20, to)
+function draw(chart: HTMLElement, l: Layout) {
+  const { start, end, movies, row, top, height, width, x } = l
+  // Each ridge in pixels, running in flat from the left edge (behind its
+  // title) and out to the right edge
+  const shape = (d: Ridge) =>
+    handInked(
+      d.id,
+      d.points.map(([t, h]) => [x(t), h * row * PEAK]),
+      width
     )
-  const leadIn = step(0, x(start))
-  const leadOut = step(x(end) + 20, width + 20)
-  // [x, y, baseline y]: the baseline wobbles with the line, so a highlighted
-  // fill has a hand-inked bottom edge too
-  type Point = [number, number, number]
-  const shape = (d: Ridge): Point[] => {
-    const shake = wobble(d.id)
-    const last = -d.points[d.points.length - 1]![1] * row * peak
-    return [
-      ...leadIn.map((px) => [px, 0]),
-      ...d.points.map(([t, h]) => [x(t), -h * row * peak]),
-      ...leadOut.map((px) => [px, last]),
-    ].map(([px, py]) => [px!, py! + shake(px!), shake(px!)])
-  }
-  const area = d3
-    .area<Point>()
-    .y0((p) => p[2])
-    .y1((p) => p[1])
-    .curve(d3.curveBasis)
-  const line = d3
-    .line<Point>()
-    .y((p) => p[1])
-    .curve(d3.curveBasis)
 
+  // Decoration for sighted mouse users; the list of titles is the content
   const svg = d3
     .create("svg")
     .attr("width", width)
     .attr("height", height)
     .attr("viewBox", [0, 0, width, height])
-    .attr("role", "group")
-    .attr(
-      "aria-label",
-      current
-        ? "The best movies of the past year, over time"
-        : `The best movies of ${data.year}, over time`
-    )
+    .attr("aria-hidden", "true")
 
   const monthWidth =
     (x.range()[1]! - x.range()[0]!) / ((end - start) / (30 * DAY))
@@ -223,28 +179,22 @@ function draw(
       })
     )
 
-  // Each ridge is a link to its movie's page, so it works from the keyboard and
-  // Astro's router handles the navigation
+  // The filled area hides the rows behind it; the stroke is the ridge line
   const ridge = svg
     .append("g")
-    .attr("class", "ridges")
-    .selectAll("a")
+    .selectAll("g")
     .data(movies)
-    .join("a")
+    .join("g")
     .attr("class", "ridge")
-    .attr("href", (d) => moviePath(d))
-    .attr("aria-label", (d) => d.title)
     .attr("transform", (_, i) => `translate(0,${top + i * row})`)
-
-  // The filled area hides the rows behind it; the stroke is the ridge line
   ridge
     .append("path")
     .attr("class", "fill")
-    .attr("d", (d) => area(shape(d)))
+    .attr("d", (d) => ridgeArea(shape(d)))
   ridge
     .append("path")
-    .attr("d", (d) => line(shape(d)))
-    .style("fill", "none")
+    .attr("class", "line")
+    .attr("d", (d) => ridgeLine(shape(d)))
   ridge
     .filter((d) => {
       const released = d.release_date ? utc(d.release_date) : NaN
@@ -254,49 +204,40 @@ function draw(
     .attr("class", "release")
     .attr("cx", (d) => x(utc(d.release_date!)))
     .attr("r", 2)
-
-  // Titles in their own column, each on its own line, with a black plate so the
-  // line passes behind it. Part of the ridge's link, so a flat ridge can still be
-  // hovered and tapped by its title.
-  const label = ridge
-    .append("g")
-    .attr("class", "label")
-    .attr("transform", `translate(${labelX},0)`)
-  label.append("rect")
-  label
-    .append("text")
-    .attr("y", font * 0.35)
-    .attr("font-size", font)
-    .text((d) => {
-      const title =
-        d.title.length > chars ? d.title.slice(0, chars - 1) + "…" : d.title
-      return ranked ? `${d.rank}. ${title}` : title
-    })
-
-  ridge
-    .on("focus", (_, d) => highlight(chart, d.id))
-    .on("blur", () => highlight(chart, null))
-    .on("pointerenter", (_, d) => {
-      highlight(chart, d.id)
-      onHover(d)
-    })
-    .on("pointerleave", () => {
-      highlight(chart, null)
-      onHover(null)
-    })
+  // The highlighted ridge's line again, faint, over everything
+  svg.append("path").attr("class", "ghost")
 
   chart.replaceChildren(svg.node()!)
+}
 
-  // Size each plate to its rank and title, now that the text can be measured
-  for (const group of chart.querySelectorAll<SVGGElement>(".label")) {
-    const textWidth = group.getBBox().width
-    d3.select(group)
-      .select("rect")
-      .attr("x", -4)
-      .attr("y", -row / 2)
-      .attr("width", textWidth + 8)
-      .attr("height", row)
+// The highlighted ridge keeps its place, so the rows in front still cover it;
+// its faint copy on top shows the parts they hide
+function highlight(chart: HTMLElement, id: string | null) {
+  const svg = d3.select(chart).select("svg")
+  const on = svg
+    .selectAll<SVGGElement, Ridge>(".ridge")
+    .classed("on", (d) => d.id === id)
+    .filter(".on")
+  svg
+    .select(".ghost")
+    .attr("d", on.empty() ? null : on.select(".line").attr("d"))
+    .attr("transform", on.empty() ? null : on.attr("transform"))
+}
+
+// The ridge seen at a point: the front-most row whose shape covers it. Each
+// row also reaches half a row either side of its line, so flat ones are easy
+// to hit and every point has one.
+function pick(l: Layout, px: number, py: number): Ridge | null {
+  const { start, movies, row, top, x } = l
+  const day = Math.round((+x.invert(px) - start) / DAY)
+  for (let i = movies.length - 1; i >= 0; i--) {
+    const { points } = movies[i]!
+    const at = points[Math.max(0, Math.min(points.length - 1, day))]
+    const h = (at?.[1] ?? 0) * row * PEAK
+    const base = top + i * row
+    if (py >= base - h - row / 2 && py <= base + row / 2) return movies[i]!
   }
+  return null
 }
 
 const fetchJson = <T,>(path: string): Promise<T | null> =>
@@ -336,48 +277,6 @@ interface Poster {
   /** In the corner: what it's sorted by, or nothing. */
   badge: string | null
   genres: string
-}
-
-// The hovered movie's poster and what's known about it
-function RidgeTip({
-  ridge: d,
-  current,
-  poster,
-}: {
-  ridge: Ridge
-  current: boolean
-  poster: string | null | undefined
-}) {
-  const stats: [string, string | number][] = [
-    current && d.last !== null ? ["Now", `#${d.last}`] : ["Year", `#${d.rank}`],
-    ["Best", `#${d.best}`],
-    ["Added", formatDate(d.joined)],
-    ["Released", d.release_date ? formatDate(d.release_date) : "Unknown"],
-  ]
-  return (
-    <div className="flex gap-3 py-0.5">
-      {poster && (
-        <img
-          src={poster}
-          alt=""
-          width="185"
-          height="278"
-          className="w-24 self-start rounded-sm"
-        />
-      )}
-      <div className="grid min-w-48 content-start gap-2">
-        <div className="text-sm leading-snug font-semibold">{d.title}</div>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5">
-          {stats.map(([label, value]) => (
-            <Fragment key={label}>
-              <dt className="opacity-60">{label}</dt>
-              <dd className="text-right font-medium tabular-nums">{value}</dd>
-            </Fragment>
-          ))}
-        </dl>
-      </div>
-    </div>
-  )
 }
 
 function Posters({ movies }: { movies: Poster[] }) {
@@ -435,7 +334,8 @@ const VIEW_KEY = "standings-view"
 const noSubscribe = () => () => {}
 function storedView(): ViewName {
   try {
-    return localStorage.getItem(VIEW_KEY) === "posters" ? "posters" : "chart"
+    const stored = localStorage.getItem(VIEW_KEY)
+    return VIEWS.find((v) => v.value === stored)?.value ?? "chart"
   } catch {
     return "chart" // Storage blocked
   }
@@ -462,15 +362,11 @@ export function Standings({
   // Each order has a natural direction (best first, latest added first, A to Z); this flips it
   const [reversed, setReversed] = useState(false)
   const [data, setData] = useState<View | null | undefined>(undefined)
-  const [swept, setSwept] = useState(false)
+  const wrapRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<HTMLDivElement>(null)
-  // The tooltip keeps showing the last ridge while it fades out
-  const [hover, setHover] = useState<Ridge | null>(null)
-  const [hovering, setHovering] = useState(false)
-  // TMDB's smaller size is plenty for the tooltip
-  const poster =
-    hover &&
-    data?.data.movies[hover.id]?.poster_url?.replace("/w500/", "/w185/")
+  const [width, setWidth] = useState(0)
+  // The highlighted movie's id, from the pointer or keyboard focus
+  const [hover, setHover] = useState<string | null>(null)
 
   const chooseView = (next: ViewName) => {
     setPicked(next)
@@ -497,37 +393,41 @@ export function Standings({
     }
   }, [choice])
 
-  // Draw at the page's width, and redraw when that changes
+  // The chart's width, kept up to date
   useEffect(() => {
-    const chart = chartRef.current
-    if (view !== "chart" || !data || !chart) return
+    const wrap = wrapRef.current
+    if (!wrap) return
+    const observer = new ResizeObserver(() => setWidth(wrap.clientWidth))
+    observer.observe(wrap)
+    return () => observer.disconnect()
+  }, [view, data])
 
-    const onHover = (next: Ridge | null) => {
-      if (next) setHover(next)
-      setHovering(next !== null)
-    }
-    setHovering(false)
-    draw(data, order, reversed, chart, onHover)
+  const shown = useMemo(
+    () => (data && width ? layout(data, order, reversed, width) : null),
+    [data, order, reversed, width]
+  )
+  // Drawn again when coming back from posters, into a new, empty chart
+  useEffect(() => {
+    if (shown && chartRef.current) draw(chartRef.current, shown)
+  }, [shown, view])
+  useEffect(() => {
+    if (chartRef.current) highlight(chartRef.current, hover)
+  }, [hover, shown, view])
 
-    let width = chart.clientWidth
-    let timer: ReturnType<typeof setTimeout>
-    const observer = new ResizeObserver(() => {
-      clearTimeout(timer)
-      timer = setTimeout(() => {
-        if (chart.clientWidth === width) return
-        width = chart.clientWidth
-        draw(data, order, reversed, chart, onHover)
-      }, 150)
-    })
-    observer.observe(chart)
-    return () => {
-      clearTimeout(timer)
-      observer.disconnect()
-    }
-  }, [data, order, reversed, view])
+  // Only a mouse highlights by pointing; a tap goes straight to the movie
+  const pointAt = (e: MouseEvent<HTMLElement>) => {
+    if (!shown) return null
+    const box = e.currentTarget.getBoundingClientRect()
+    return pick(shown, e.clientX - box.left, e.clientY - box.top)
+  }
+  const ranked = order === "rank"
+  const backdrop =
+    hover &&
+    (data?.data.movies[hover]?.backdrop_url ??
+      data?.data.movies[hover]?.poster_url)
 
   // Before the history loads (and on the server), posters are the page's list.
-  // Kept between hovers, which re-render this.
+  // Kept between highlights, which re-render this.
   const posters = useMemo((): Poster[] => {
     return data
       ? rows(data, order, reversed).movies.map((movie) => ({
@@ -639,37 +539,65 @@ export function Standings({
       ) : view === "posters" ? (
         <Posters movies={posters} />
       ) : (
-        <div className="relative">
-          <Tooltip open={hovering} trackCursorAxis="both">
-            <TooltipTrigger
-              render={
-                <div
-                  ref={chartRef}
-                  className={cn("standings-chart", !data && "min-h-[60svh]")}
-                />
-              }
-            />
-            {hover && (
-              <TooltipContent
-                side="right"
-                sideOffset={16}
-                className="pointer-events-none block px-3 py-2"
-              >
-                <RidgeTip
-                  ridge={hover}
-                  current={data?.current ?? false}
-                  poster={poster}
-                />
-              </TooltipContent>
+        <div
+          ref={wrapRef}
+          className="relative"
+          onPointerLeave={() => setHover(null)}
+        >
+          {/* The highlighted movie's poster behind the page */}
+          {backdrop && (
+            <img src={backdrop} alt="" className="backdrop" decoding="async" />
+          )}
+          <div
+            ref={chartRef}
+            className={cn(
+              "standings-chart",
+              !shown && "min-h-[60svh]",
+              hover && "cursor-pointer"
             )}
-          </Tooltip>
-          {/* Slides off to the right once, so the chart comes in from the left */}
-          {!swept && (
-            <div
-              aria-hidden="true"
-              className="sweep"
-              onAnimationEnd={() => setSwept(true)}
-            />
+            onPointerMove={(e) => {
+              if (e.pointerType === "mouse") setHover(pointAt(e)?.id ?? null)
+            }}
+            onClick={(e) => {
+              const movie = pointAt(e)
+              if (movie) navigate(moviePath(movie))
+            }}
+          />
+          {shown && (
+            <ol
+              aria-label={
+                data?.current
+                  ? "The best movies of the past year"
+                  : `The best movies of ${data?.data.year}`
+              }
+              className="absolute"
+              style={{
+                top: shown.top - shown.row / 2,
+                left: shown.gutter,
+                width: shown.column,
+                fontSize: shown.font,
+              }}
+            >
+              {shown.movies.map((movie) => (
+                <li key={movie.id} style={{ height: shown.row }}>
+                  <a
+                    href={moviePath(movie)}
+                    className={cn(
+                      "standings-title",
+                      hover === movie.id && "on"
+                    )}
+                    onPointerMove={(e) => {
+                      if (e.pointerType === "mouse") setHover(movie.id)
+                    }}
+                    onFocus={() => setHover(movie.id)}
+                    onBlur={() => setHover(null)}
+                  >
+                    {ranked && <span className="rank">{movie.rank}</span>}
+                    <span className="title">{movie.title}</span>
+                  </a>
+                </li>
+              ))}
+            </ol>
           )}
         </div>
       )}
