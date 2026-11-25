@@ -22,6 +22,10 @@ export const FILES = {
   scores: "data/scores.json",
 } as const
 
+/** The month's backup of all the data: data/archive/YYYY-MM.json. */
+export const archiveFilename = (date: string) =>
+  `data/archive/${date.slice(0, 7)}.json`
+
 /** A night's public list: best-pictures-YYYYMMDD.json, like Steven Lu's movies-YYYYMMDD.json. */
 export const datedFilename = (date: string) =>
   `best-pictures-${date.replaceAll("-", "")}.json`

@@ -4,7 +4,12 @@ import * as data from "../pipeline/lib/data.ts"
 import type { Movie } from "../pipeline/lib/types.ts"
 import validateList from "../pipeline/lib/validate.ts"
 import config from "../pipeline/config.ts"
-import { pickTop, standingScores } from "../pipeline/rank.ts"
+import {
+  checkRatings,
+  checkScores,
+  pickTop,
+  standingScores,
+} from "../pipeline/rank.ts"
 import { listYears, yearList } from "../pipeline/lib/years.ts"
 
 const range = (from: number, to: number, step = 1) =>
@@ -133,6 +138,26 @@ describe("standings", () => {
       range(40, 40 - config.LIST_SIZE, -1)
     )
   })
+
+  it("stops when most movies have no ratings", () => {
+    const rated = (imdb_rating: number | null) =>
+      ({ imdb_rating }) as unknown as Movie
+    checkRatings([rated(7), rated(6), rated(null)])
+    assert.throws(
+      () => checkRatings([rated(7), rated(null), rated(null)]),
+      /MDBList/
+    )
+  })
+
+  it("stops when tonight's scores are flat or mostly missing", () => {
+    const all = movies([1, 2, 3, 4])
+    checkScores(all, { 1: 90, 2: 70, 3: 40, 4: 20 })
+    assert.throws(
+      () => checkScores(all, { 1: 80, 2: 79, 3: 81, 4: 80 }),
+      /span/
+    )
+    assert.throws(() => checkScores(all, { 1: 90 }), /scored only/)
+  })
 })
 
 describe("best-pictures.json", () => {
@@ -216,5 +241,17 @@ describe("year lists", () => {
     const years = listYears([lu("2026-01-01", [1])])
     assert.equal(years[0], 2019)
     assert.equal(years.at(-1), 2026)
+  })
+
+  it("starts a new year empty on Jan 1, while last year keeps its movies", () => {
+    const rankings = [
+      { date: "2026-12-31", ids: [3, 2] },
+      { date: "2027-01-01", ids: [3, 2] },
+    ]
+    const scores = { 2: 70, 3: 90 }
+    assert.equal(listYears(rankings).at(-1), 2027)
+    assert.deepEqual(yearList(rankings, catalog, scores, 2027), [])
+    assert.deepEqual(yearList(rankings, catalog, scores, 2026), [3, 2])
+    validateList("best-pictures-2027.json", [], { requireImdbId: true })
   })
 })

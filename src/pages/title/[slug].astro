@@ -159,7 +159,7 @@ const jsonLd = [
         class="grid grid-cols-2 gap-6 px-4 pt-2 pb-6 sm:px-6"
       >
         {prev ? (
-          <a href={prev.href} class="group flex items-center gap-3">
+          <a href={prev.href} rel="prev" class="group flex items-center gap-3">
             <span class="flex shrink-0 items-center font-heading text-4xl leading-none font-extrabold tracking-[-0.05em] text-muted-foreground tabular-nums group-hover:text-foreground">
               <ArrowLeft
                 aria-hidden="true"
@@ -177,6 +177,7 @@ const jsonLd = [
         {next && (
           <a
             href={next.href}
+            rel="next"
             class="group flex items-center justify-end gap-3 text-right"
           >
             <span class="font-medium text-balance group-hover:text-primary">
@@ -195,3 +196,15 @@ const jsonLd = [
     )}
   </section>
 </Layout>
+
+<script>
+  // ← and → step through the standings, like the links at the bottom
+  document.addEventListener("keydown", (event) => {
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+    if ((event.target as HTMLElement).closest("input, textarea, select")) return
+    const rel = { ArrowLeft: "prev", ArrowRight: "next" }[event.key]
+    const link =
+      rel && document.querySelector<HTMLAnchorElement>(`a[rel="${rel}"]`)
+    if (link) link.click()
+  })
+</script>

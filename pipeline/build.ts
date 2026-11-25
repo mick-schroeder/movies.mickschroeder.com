@@ -71,10 +71,13 @@ for (const { name, list } of years) {
 const write = (name: string, value: unknown) =>
   writeFileSync(new URL(name, OUTPUT_DIR), JSON.stringify(value))
 
-mkdirSync(new URL("data/", OUTPUT_DIR), { recursive: true })
+mkdirSync(new URL("data/archive/", OUTPUT_DIR), { recursive: true })
 write(data.FILES.rankings, updated.rankings)
 write(data.FILES.catalog, updated.catalog)
 write(data.FILES.scores, updated.scores)
+// A backup of all three that stops changing when the month ends. S3 keeps
+// overwritten files for only a week, so these are the history to restore from.
+write(data.archiveFilename(today), updated)
 for (const { name, list } of [...lists, ...years]) write(name, list)
 write("best-pictures.json", tonight)
 

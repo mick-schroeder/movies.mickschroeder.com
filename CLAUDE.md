@@ -3,6 +3,7 @@
 Astro + shadcn site with a nightly data pipeline. See README.md for layout and commands.
 
 - pnpm only. Run `pnpm check` before calling work done.
+- Check changes in the browser against `pnpm dev`, which picks up edits as you save. `pnpm preview` serves the last `pnpm build`; use it only to check the built site.
 - Keep it simple: stock Astro and shadcn features over custom code; React islands only for interactivity.
 - Add shadcn components with `pnpm dlx shadcn@latest add`; don't edit `src/components/ui/` by hand.
 - Use the `astro-docs` and `shadcn` MCP servers to check current APIs instead of guessing.

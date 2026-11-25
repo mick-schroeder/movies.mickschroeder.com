@@ -119,8 +119,35 @@ export async function rankMovies(
     )
   }
 
+  checkRatings(movies)
   const tonight = await scoreMovies(movies.map(promptData))
+  checkScores(movies, tonight)
   return pickTop(movies, standingScores(movies, tonight, previousScores))
+}
+
+// Throws if most movies came back with no ratings (an MDBList outage that didn't
+// error), since the AI would then be scoring blind
+export function checkRatings(movies: Movie[]) {
+  const rated = movies.filter((movie) => movie.imdb_rating != null).length
+  if (rated < movies.length / 2) {
+    throw new Error(
+      `Only ${rated} of ${movies.length} movies have an IMDb rating. Is MDBList down?`
+    )
+  }
+}
+
+// Throws if tonight's scores look broken: nearly all the same, or most movies unscored
+export function checkScores(movies: { id: number }[], tonight: Scores) {
+  const values = movies.map((m) => tonight[m.id]).filter((s) => s != null)
+  const missing = movies.length - values.length
+  if (missing) console.warn(`The AI skipped ${missing} movies tonight`)
+  if (values.length < movies.length / 2) {
+    throw new Error(`The AI scored only ${values.length} of ${movies.length}`)
+  }
+  const spread = Math.max(...values) - Math.min(...values)
+  if (spread < 20) {
+    throw new Error(`Tonight's scores only span ${spread} points`)
+  }
 }
 
 // The LIST_SIZE movies with the highest standing scores. Movies with no score are left out,

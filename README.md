@@ -1,6 +1,6 @@
 # Best Pictures
 
-The best movies of the past 12 months, re-ranked every night by an AI critic.
+The best movies of the past 12 months, ranked every night by an AI critic.
 
 This started as a fork of [sjlu/popular-movies](https://github.com/sjlu/popular-movies)
 by Steven Lu. `best-pictures.json` keeps **the same JSON format**, so anything that read the
@@ -46,11 +46,12 @@ Every night from Dec 2, 2019, until this site started ranking its own is backfil
 
 The site keeps its own working data under `data/`. It isn't a contract and may change; use the files above instead.
 
-| File                 | Contents                                                                                                                            |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `data/rankings.json` | Every night's TMDB ids, best first, oldest night first; Steven Lu's nights have `"source": "stevenlu"`                              |
-| `data/movies.json`   | Every movie that has been in the standings, by TMDB id: title, IMDb id, poster, release date, genres, runtime, trailer              |
-| `data/scores.json`   | Each movie's standing score after the latest night, which tomorrow's ranking starts from; a movie that left the pool keeps its last |
+| File                        | Contents                                                                                                                                                                   |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data/rankings.json`        | Every night's TMDB ids, best first, oldest night first; Steven Lu's nights have `"source": "stevenlu"`                                                                     |
+| `data/movies.json`          | Every movie that has been in the standings, by TMDB id: title, IMDb id, poster, release date, genres, runtime, trailer                                                     |
+| `data/scores.json`          | Each movie's standing score after the latest night, which tomorrow's ranking starts from; a movie that left the pool keeps its last                                        |
+| `data/archive/YYYY-MM.json` | A backup of all three as `{ rankings, catalog, scores }` from the month's last night, e.g. `data/archive/2026-11.json`. Restore by splitting one back into the three files |
 
 ## How it works
 
@@ -78,7 +79,7 @@ infra/      AWS stack: S3 + CloudFront + GitHub OIDC role
    Without `public/best-pictures.json` (local dev, CI) it uses the live file instead.
 3. The `publish` GitHub Actions workflow runs both nightly, uploads `dist/` to S3
    and refreshes CloudFront. If any check fails, nothing is uploaded and the
-   previous day's files stay live. If `data/` can't be downloaded the
+   previous day's files stay live.  If `data/` can't be downloaded the
    build fails rather than start over. For the very first run, start the
    workflow by hand with **new_history** checked (locally: `pnpm build:data --new-history`).
 4. The ranking instructions are in [`pipeline/prompts/rank-movies.md`](pipeline/prompts/rank-movies.md).
