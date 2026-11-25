@@ -79,7 +79,7 @@ infra/      AWS stack: S3 + CloudFront + GitHub OIDC role
    Without `public/best-pictures.json` (local dev, CI) it uses the live file instead.
 3. The `publish` GitHub Actions workflow runs both nightly, uploads `dist/` to S3
    and refreshes CloudFront. If any check fails, nothing is uploaded and the
-   previous day's files stay live.  If `data/` can't be downloaded the
+   previous day's files stay live. If `data/` can't be downloaded the
    build fails rather than start over. For the very first run, start the
    workflow by hand with **new_history** checked (locally: `pnpm build:data --new-history`).
 4. The ranking instructions are in [`pipeline/prompts/rank-movies.md`](pipeline/prompts/rank-movies.md).
