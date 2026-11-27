@@ -4,9 +4,8 @@
 //
 // pipeline/lists.json maps each file to its list on each site. A file that isn't
 // live yet (next year's) is skipped, and so is a site whose key isn't set:
-//   mdblist  a static list, its `id` from
-//            https://api.mdblist.com/lists/{username}/{list-slug}?apikey=...
-//            Uses MDBLIST_KEY.
+//   mdblist  a static list, as "{username}/{list-slug}" from its URL
+//            (also how the site links to it). Uses MDBLIST_KEY.
 //   tmdb     a list, the number in its URL. Uses TMDB_LIST_TOKEN, a v4 user access
 //            token for the lists' owner (see README).
 //
@@ -37,8 +36,10 @@ async function mdblist(path: string, body?: unknown) {
 }
 
 // Removes the movies that left, adds the new ones, then sets the order.
-async function syncMdblist(listId: number, movies: ListMovie[]) {
-  const items = `/lists/${listId}/items`
+async function syncMdblist(list: string | number, movies: ListMovie[]) {
+  // Changes need the list's number, which its URL doesn't show
+  const [{ id }]: [{ id: number }] = await mdblist(`/lists/${list}`)
+  const items = `/lists/${id}/items`
   const current: { id: number }[] =
     (await mdblist(`${items}?limit=1000`)).movies ?? []
 
@@ -92,7 +93,7 @@ async function tmdb(method: string, path: string, body?: unknown) {
 
 // If the list isn't already these movies in this order, empties it and adds
 // them; the list shows them in the order added.
-async function syncTmdb(listId: number, movies: ListMovie[]) {
+async function syncTmdb(listId: string | number, movies: ListMovie[]) {
   const list = `/list/${listId}`
   const listed: number[] = []
   let sortBy = ""
@@ -139,6 +140,14 @@ for (const [file, ids] of Object.entries(lists)) {
     }
     if (!resp.ok) throw new Error(`responded with ${resp.status}`)
     movies = await resp.json()
+    // An empty or broken file would empty the lists people follow
+    if (
+      !Array.isArray(movies) ||
+      movies.length === 0 ||
+      !movies.every((m) => Number.isInteger(m?.tmdb_id))
+    ) {
+      throw new Error("isn't a list of movies")
+    }
   } catch (error) {
     console.error(`${file}:`, error)
     process.exitCode = 1

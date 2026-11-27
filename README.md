@@ -86,11 +86,10 @@ infra/      AWS stack: S3 + CloudFront + GitHub OIDC role
    `best-pictures.json` and year files, in order, to the lists in
    [`pipeline/lists.json`](pipeline/lists.json) on [MDBList](https://mdblist.com/lists/mick_schroeder/mick-schroeders-current-best-pictures)
    and [TMDB](https://www.themoviedb.org/list/8719892). It runs last, so a failure there never holds
-   back the site. A file that isn't live yet is skipped, so next year's list fills on Jan 1. To add a list,
-   create it and add its id to `lists.json`:
-   - MDBList: a static list. Its `id` is at
-     `https://api.mdblist.com/lists/{username}/{list-slug}?apikey=...` (the list's URL doesn't show it).
-     Uses `MDBLIST_KEY`.
+   back the site. A file that isn't live yet is skipped, so next year's list fills on Jan 1, and an empty
+   or broken file is refused rather than emptying the lists. The about page links every list from
+   `lists.json`. To add a list, create it and add it to `lists.json`:
+   - MDBList: a static list, as `{username}/{list-slug}` from its URL. Uses `MDBLIST_KEY`.
    - TMDB: the number in the list's URL. Writing needs a v4 user access token, the `TMDB_LIST_TOKEN`
      secret. Get one with your API Read Access Token (TMDB settings → API):
      `POST https://api.themoviedb.org/4/auth/request_token`, approve it at

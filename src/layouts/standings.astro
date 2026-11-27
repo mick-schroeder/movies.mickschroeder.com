@@ -12,7 +12,8 @@ import { SITE } from "@/consts"
 import Layout from "@/layouts/base.astro"
 import { getYears } from "@/lib/movies"
 import { Braces } from "lucide-react"
-import { siGithub } from "simple-icons"
+import { siGithub, siMdblist, siThemoviedatabase } from "simple-icons"
+import lists from "../../pipeline/lists.json"
 
 interface Props {
   title: string
@@ -28,6 +29,8 @@ const { title, description, choice, listed, listName } = Astro.props
 const years = getYears()
 const json =
   choice === "current" ? "/best-pictures.json" : `/best-pictures-${choice}.json`
+// The page's lists on MDBList and TMDB, which pnpm sync:lists keeps in step
+const followLists = lists[json.slice(1) as keyof typeof lists]
 
 const jsonLd = [
   {
@@ -68,6 +71,24 @@ const jsonLd = [
           <BrandIcon icon={siGithub} />
           Source
         </a>
+        {followLists && (
+          <>
+            <a
+              href={`https://mdblist.com/lists/${followLists.mdblist}`}
+              class={buttonVariants({ variant: "outline" })}
+            >
+              <BrandIcon icon={siMdblist} />
+              MDBList
+            </a>
+            <a
+              href={`https://www.themoviedb.org/list/${followLists.tmdb}`}
+              class={buttonVariants({ variant: "outline" })}
+            >
+              <BrandIcon icon={siThemoviedatabase} />
+              TMDB
+            </a>
+          </>
+        )}
       </div>
     </div>
     <Standings client:load years={years} choice={choice} listed={listed} />

@@ -6,12 +6,21 @@ import { LIST_SIZE, SITE } from "@/consts"
 import Layout from "@/layouts/base.astro"
 import { getMovies, getYears } from "@/lib/movies"
 import { moviePath } from "@/lib/links"
+import lists from "../../pipeline/lists.json"
 
 const description =
   "How the AI critic ranks the best movies, and the lists as JSON feeds."
 const years = getYears()
 const prompt = `${SITE.code}/blob/main/pipeline/prompts/rank-movies.md`
 const link = "underline hover:text-primary"
+
+// The lists pnpm sync:lists keeps on other sites, for the years that have a page
+const followLists = Object.entries(lists)
+  .map(([file, list]) => ({
+    name: file.match(/\d{4}/)?.[0] ?? "Current",
+    ...list,
+  }))
+  .filter(({ name }) => name === "Current" || years.includes(Number(name)))
 
 // Tonight's #1, as the example of how to read a ridge
 const top = (await getMovies()).find((movie) => movie.current === 1)
@@ -140,6 +149,32 @@ const top = (await getMovies()).find((movie) => movie.current === 1)
           are Steven Lu’s lists.
         </p>
       </div>
+    </section>
+
+    <section aria-labelledby="lists" class="flex flex-col gap-4">
+      <h2
+        id="lists"
+        class="font-heading text-3xl font-extrabold tracking-tight"
+      >
+        Lists
+      </h2>
+      <p>
+        The same lists on MDBList and TMDB, updated every night, to follow there
+        or add to apps that read them.
+      </p>
+      <ul class="flex flex-col gap-1">
+        {followLists.map(({ name, mdblist, tmdb }) => (
+          <li class="flex gap-4">
+            <span class="w-16 font-semibold">{name}</span>
+            <a href={`https://mdblist.com/lists/${mdblist}`} class={link}>
+              MDBList
+            </a>
+            <a href={`https://www.themoviedb.org/list/${tmdb}`} class={link}>
+              TMDB
+            </a>
+          </li>
+        ))}
+      </ul>
     </section>
   </div>
 </Layout>
