@@ -6,8 +6,6 @@ interface TmdbMovie {
   id: number
   title: string
   release_date?: string
-  popularity: number
-  vote_average: number
   vote_count: number
   poster_path: string | null
   backdrop_path: string | null
@@ -92,8 +90,6 @@ const formatMovie = (movie: TmdbMovie): Movie => ({
   id: movie.id,
   title: movie.title,
   release_date: movie.release_date || null,
-  popularity: movie.popularity,
-  vote_average: movie.vote_average,
   vote_count: movie.vote_count,
   poster_url: posterUrl(movie.poster_path),
   backdrop_url: backdropUrl(movie.backdrop_path),
@@ -127,7 +123,7 @@ export async function getMovies(): Promise<Movie[]> {
     movies.push(...(await discover(page)).results)
   }
 
-  return movies.filter(Boolean).map(formatMovie)
+  return movies.map(formatMovie)
 }
 
 export function getMovie(id: number) {
@@ -143,14 +139,4 @@ export async function findByImdbId(imdbId: string): Promise<number | null> {
     { external_source: "imdb_id" }
   )
   return found.movie_results[0]?.id ?? null
-}
-
-export async function searchMovie(title: string, year?: number) {
-  const query: Record<string, string | number> = {
-    query: title.replace(/[^\w\s]/gi, ""),
-  }
-  if (year) query.year = year
-
-  const { results } = await request<TmdbPage>("/search/movie", query)
-  return results[0] && formatMovie(results[0])
 }

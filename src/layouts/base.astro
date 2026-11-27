@@ -25,7 +25,7 @@ const { hideTitle = false, ...head } = Astro.props
   <body class="antialiased">
     <!-- App-like: the page fills one screen, with the footer below it -->
     <div class="flex min-h-svh flex-col">
-      <SiteHeader hideTitle={hideTitle}>
+      <SiteHeader name={SITE.name} hideTitle={hideTitle}>
         <nav aria-label="Site">
           <ul class="flex gap-4 text-sm text-muted-foreground">
             {[

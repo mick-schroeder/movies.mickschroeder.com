@@ -1,11 +1,11 @@
 ---
-import { SITE } from "@/consts"
-
 interface Props {
-  /** Leave the title out, when the page shows it large itself. */
+  /** The site's name, linked home. */
+  name: string
+  /** Leave the name out, when the page shows it large itself. */
   hideTitle?: boolean
 }
-const { hideTitle = false } = Astro.props
+const { name, hideTitle = false } = Astro.props
 ---
 
 <header class="flex items-center justify-between gap-4 px-4 py-3 sm:px-6">
@@ -16,7 +16,7 @@ const { hideTitle = false } = Astro.props
       hideTitle && "invisible",
     ]}
   >
-    {SITE.name}
+    {name}
   </a>
   <!-- The site's own links, at the right -->
   <slot />

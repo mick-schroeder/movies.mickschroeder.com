@@ -4,6 +4,7 @@
 import { gunzipSync } from "node:zlib"
 import type { Catalog, ListMovie, RankDay } from "../../src/lib/types.ts"
 import config from "../config.ts"
+import { catalogMovie } from "./data.ts"
 import getRatings from "./mdblist.ts"
 import * as tmdb from "./tmdb.ts"
 
@@ -79,7 +80,8 @@ export async function backfill(
   for (const [id, imdbId] of imdbIds) {
     const details = await tmdb.getMovie(id)
     const links = ratings[id]?.links
-    catalog[id] = {
+    catalog[id] = catalogMovie({
+      id,
       title: details.title,
       imdb_id: details.imdb_id || imdbId,
       poster_url: tmdb.posterUrl(details.poster_path),
@@ -88,8 +90,8 @@ export async function backfill(
       genres: tmdb.genreSlugs(details),
       runtime: details.runtime || null,
       trailer_url: tmdb.trailerUrl(details),
-      ...(links && Object.keys(links).length && { links }),
-    }
+      ...(links && { links }),
+    })
   }
 
   console.log({

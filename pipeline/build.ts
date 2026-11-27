@@ -42,17 +42,12 @@ const lists = nights.map((night) => ({
   list: data.toList(night.ids, updated.catalog),
 }))
 for (const { name, list } of lists) {
-  validateList(name, list, {
-    min: 1,
-    max: config.LIST_SIZE,
-    requireImdbId: true,
-  })
+  validateList(name, list, { min: 1, max: config.LIST_SIZE })
 }
 const tonight = lists.at(-1)!.list
 validateList("best-pictures.json", tonight, {
   min: config.LIST_SIZE,
   max: config.LIST_SIZE,
-  requireImdbId: true,
 })
 
 // Every year's list, since a year's movies keep moving while they're still ranked
@@ -64,7 +59,7 @@ const years = listYears(updated.rankings).map((year) => ({
   ),
 }))
 for (const { name, list } of years) {
-  validateList(name, list, { requireImdbId: true })
+  validateList(name, list)
 }
 
 // Everything passed: write it out

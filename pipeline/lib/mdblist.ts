@@ -11,7 +11,6 @@ type Ratings = Pick<
   | "metacritic_score"
   | "letterboxd_rating"
   | "letterboxd_votes"
-  | "mdblist_score"
   | "links"
 >
 
@@ -24,7 +23,6 @@ interface Rating {
 
 interface MdblistMovie {
   ids: { tmdb: number }
-  score?: number
   ratings?: Rating[]
 }
 
@@ -80,7 +78,6 @@ export default async function getRatings(
         metacritic_score: rating("metacritic").value ?? null,
         letterboxd_rating: rating("letterboxd").value ?? null,
         letterboxd_votes: rating("letterboxd").votes ?? null,
-        mdblist_score: movie.score ?? null,
         links: links(rating),
       }
     }

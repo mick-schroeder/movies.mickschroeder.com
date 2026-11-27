@@ -20,15 +20,14 @@ describe(
       assert.ok(ratings.metacritic_score! > 1)
     })
 
-    it("finds a tmdb movie", async () => {
-      const movie = await tmdb.searchMovie(MOVIE_TITLE)
-      assert.equal(movie?.id, TMDB_ID)
-      assert.ok(movie.popularity! > 1)
-      assert.equal(typeof movie.release_date, "string")
+    it("gets a tmdb movie", async () => {
+      const movie = await tmdb.getMovie(TMDB_ID)
+      assert.equal(movie.title, MOVIE_TITLE)
+      assert.equal(movie.imdb_id, IMDB_ID)
     })
 
-    it("gets a tmdb movie's imdb id", async () => {
-      assert.equal((await tmdb.getMovie(TMDB_ID)).imdb_id, IMDB_ID)
+    it("finds a tmdb id by imdb id", async () => {
+      assert.equal(await tmdb.findByImdbId(IMDB_ID), TMDB_ID)
     })
   }
 )

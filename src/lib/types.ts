@@ -3,13 +3,14 @@
 // Public contract, Steven Lu's popular-movies format (an array of ListMovie):
 //   best-pictures.json            the current standings
 //   best-pictures-YYYYMMDD.json   each night's standings, like his movies-YYYYMMDD.json
+//   best-pictures-YYYY.json       each year's best movies
 //
 // The site's own working data, not a contract (free to change):
 //   data/rankings.json   every night's tmdb ids, best first (RankDay[])
 //   data/movies.json     details of every movie that has been in the standings (Catalog)
 //   data/scores.json     the latest standing scores the pipeline smooths from (Scores)
 
-/** One movie in best-pictures.json and best-pictures-YYYYMMDD.json. Don't change it. */
+/** One movie in the best-pictures*.json files. Don't change it. */
 export interface ListMovie {
   title: string
   tmdb_id: number

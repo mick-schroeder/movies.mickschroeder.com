@@ -58,7 +58,7 @@ describe("data", () => {
   it("lists a night in Steven Lu's format", () => {
     const d = data.addNight(empty, "2026-11-23", [movie(2), movie(1)], {})
     const list = data.toList(d.rankings[0]!.ids, d.catalog)
-    validateList("best-pictures-20261123.json", list, { requireImdbId: true })
+    validateList("best-pictures-20261123.json", list)
     assert.deepEqual(list[0], {
       title: "Movie 2",
       tmdb_id: 2,
@@ -170,11 +170,7 @@ describe("best-pictures.json", () => {
   }
 
   it("accepts the v1 format", () => {
-    validateList("best-pictures.json", [good], {
-      min: 1,
-      max: 1,
-      requireImdbId: true,
-    })
+    validateList("best-pictures.json", [good], { min: 1, max: 1 })
   })
 
   it("rejects extra fields and bad ids", () => {
@@ -183,10 +179,7 @@ describe("best-pictures.json", () => {
       /Unrecognized key: "score"/
     )
     assert.throws(
-      () =>
-        validateList("best-pictures.json", [{ ...good, imdb_id: null }], {
-          requireImdbId: true,
-        }),
+      () => validateList("best-pictures.json", [{ ...good, imdb_id: null }]),
       /bad imdb_id/
     )
   })
@@ -252,6 +245,6 @@ describe("year lists", () => {
     assert.equal(listYears(rankings).at(-1), 2027)
     assert.deepEqual(yearList(rankings, catalog, scores, 2027), [])
     assert.deepEqual(yearList(rankings, catalog, scores, 2026), [3, 2])
-    validateList("best-pictures-2027.json", [], { requireImdbId: true })
+    validateList("best-pictures-2027.json", [])
   })
 })

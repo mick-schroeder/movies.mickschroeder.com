@@ -6,7 +6,6 @@
 // Later rows are drawn in front. The titles are an HTML list of links over the
 // chart's left edge, one per row.
 import * as d3 from "d3"
-import { cn } from "cn"
 import { navigate } from "astro:transitions/client"
 import {
   ArrowDownWideNarrow,
@@ -49,7 +48,7 @@ import {
   yearSpan,
 } from "@/lib/ridgeline"
 import { moviePath } from "@/lib/links"
-import { genreLabel } from "@/lib/utils"
+import { cn, genreLabel } from "@/lib/utils"
 import type { Catalog, RankDay } from "@/lib/types"
 
 /**
@@ -367,9 +366,10 @@ export function Standings({
   const [order, setOrder] = useState<Order>("rank")
   // Each order has a natural direction (best first, latest added first, A to Z); this flips it
   const [reversed, setReversed] = useState(false)
-  const [data, setData] = useState<View | null | undefined>(undefined)
-  // The history couldn't be fetched (the posters still show the page's list)
-  const [failed, setFailed] = useState(false)
+  // The chart's data once the history loads: none for this period yet, or it
+  // couldn't be fetched (the posters still show the page's list)
+  const [loaded, setLoaded] = useState<View | "empty" | "failed">()
+  const data = typeof loaded === "object" ? loaded : null
   const wrapRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(0)
@@ -392,10 +392,7 @@ export function Standings({
     const current = choice === CURRENT
     loadHistory().then(([rankings, movies]) => {
       if (cancelled) return
-      if (!rankings || !movies) {
-        setFailed(true)
-        return setData(null)
-      }
+      if (!rankings || !movies) return setLoaded("failed")
       const shown = current
         ? pastYear(rankings, movies)
         : yearListOf(
@@ -404,7 +401,7 @@ export function Standings({
             listed.map((movie) => movie.id),
             Number(choice)
           )
-      setData(shown.days.length ? { data: shown, current } : null)
+      setLoaded(shown.days.length ? { data: shown, current } : "empty")
     })
     return () => {
       cancelled = true
@@ -550,7 +547,7 @@ export function Standings({
           ))}
         </ToggleGroup>
       </div>
-      {data === null && !failed ? (
+      {loaded === "empty" ? (
         <Empty className="py-32">
           <EmptyDescription>
             No rankings for {choice === CURRENT ? "the past 12 months" : choice}{" "}
@@ -559,7 +556,7 @@ export function Standings({
         </Empty>
       ) : view === "posters" ? (
         <Posters movies={posters} />
-      ) : failed ? (
+      ) : loaded === "failed" ? (
         <Empty className="py-32">
           <EmptyDescription>
             Couldn’t load the chart. Try Posters, or reload the page.

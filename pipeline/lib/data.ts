@@ -1,6 +1,7 @@
 import * as z from "zod"
 import type {
   Catalog,
+  CatalogMovie,
   ListMovie,
   RankDay,
   Scores,
@@ -67,27 +68,30 @@ export function addNight(
   rankings.push({ date, ids: movies.map((movie) => movie.tmdb_id!) })
 
   const catalog = { ...data.catalog }
-  for (const movie of movies) {
-    const { tmdb_id, title, imdb_id, poster_url, release_date } = movie
-    const { genres = [], runtime = null, trailer_url = null, links } = movie
-    const { backdrop_url = null } = movie
-    catalog[tmdb_id!] = {
-      title,
-      imdb_id: imdb_id!,
-      poster_url,
-      backdrop_url,
-      release_date,
-      genres,
-      runtime,
-      trailer_url,
-      ...(links && Object.keys(links).length && { links }),
-    }
-  }
+  for (const movie of movies) catalog[movie.tmdb_id!] = catalogMovie(movie)
 
   return {
     rankings: rankings.toSorted((a, b) => a.date.localeCompare(b.date)),
     catalog,
     scores,
+  }
+}
+
+/** A movie's details as data/movies.json keeps them. */
+export function catalogMovie(movie: Movie): CatalogMovie {
+  const { title, imdb_id, poster_url, release_date, links } = movie
+  const { backdrop_url = null, genres = [], runtime = null } = movie
+  const { trailer_url = null } = movie
+  return {
+    title,
+    imdb_id: imdb_id!,
+    poster_url,
+    backdrop_url,
+    release_date,
+    genres,
+    runtime,
+    trailer_url,
+    ...(links && Object.keys(links).length && { links }),
   }
 }
 

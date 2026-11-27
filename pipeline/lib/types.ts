@@ -7,8 +7,6 @@ export interface Movie {
   id: number
   title: string
   release_date: string | null
-  popularity?: number
-  vote_average?: number
   vote_count?: number
   poster_url: string | null
   /** A wide, text-free still, for page backgrounds. */
@@ -26,6 +24,5 @@ export interface Movie {
   metacritic_score?: number | null
   letterboxd_rating?: number | null
   letterboxd_votes?: number | null
-  mdblist_score?: number | null
   links?: MovieLinks
 }
