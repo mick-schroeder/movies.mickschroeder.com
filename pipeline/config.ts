@@ -7,6 +7,8 @@ const env = (name: string, fallback = "") => process.env[name] || fallback
 export default {
   TMDB_KEY: env("TMDB_KEY"),
   MDBLIST_KEY: env("MDBLIST_KEY"),
+  // pnpm sync:lists: a v4 user access token for the owner of the TMDB lists
+  TMDB_LIST_TOKEN: env("TMDB_LIST_TOKEN"),
   ANTHROPIC_API_KEY: env("ANTHROPIC_API_KEY"),
   ANTHROPIC_MODEL: env("ANTHROPIC_MODEL", "claude-haiku-5-5"),
   // Where the build downloads earlier data (data/*.json) from

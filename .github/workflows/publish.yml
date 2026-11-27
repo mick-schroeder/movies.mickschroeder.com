@@ -83,3 +83,11 @@ jobs:
             fi
             echo "$file OK"
           done
+
+      # Copies the live best-pictures.json and year files to the lists in pipeline/lists.json.
+      # Last, so a failure here never holds back the site.
+      - name: Sync lists
+        run: pnpm sync:lists
+        env:
+          MDBLIST_KEY: ${{ secrets.MDBLIST_KEY }}
+          TMDB_LIST_TOKEN: ${{ secrets.TMDB_LIST_TOKEN }}

@@ -82,7 +82,21 @@ infra/      AWS stack: S3 + CloudFront + GitHub OIDC role
    previous day's files stay live. If `data/` can't be downloaded the
    build fails rather than start over. For the very first run, start the
    workflow by hand with **new_history** checked (locally: `pnpm build:data --new-history`).
-4. The ranking instructions are in [`pipeline/prompts/rank-movies.md`](pipeline/prompts/rank-movies.md).
+4. `pnpm sync:lists` ([`pipeline/sync-lists.ts`](pipeline/sync-lists.ts)) then copies the live
+   `best-pictures.json` and year files, in order, to the lists in
+   [`pipeline/lists.json`](pipeline/lists.json) on [MDBList](https://mdblist.com/lists/mick_schroeder/mick-schroeders-current-best-pictures)
+   and [TMDB](https://www.themoviedb.org/list/8719892). It runs last, so a failure there never holds
+   back the site. A file that isn't live yet is skipped, so next year's list fills on Jan 1. To add a list,
+   create it and add its id to `lists.json`:
+   - MDBList: a static list. Its `id` is at
+     `https://api.mdblist.com/lists/{username}/{list-slug}?apikey=...` (the list's URL doesn't show it).
+     Uses `MDBLIST_KEY`.
+   - TMDB: the number in the list's URL. Writing needs a v4 user access token, the `TMDB_LIST_TOKEN`
+     secret. Get one with your API Read Access Token (TMDB settings → API):
+     `POST https://api.themoviedb.org/4/auth/request_token`, approve it at
+     `https://www.themoviedb.org/auth/access?request_token=...`, then
+     `POST https://api.themoviedb.org/4/auth/access_token` with `{"request_token": "..."}`.
+5. The ranking instructions are in [`pipeline/prompts/rank-movies.md`](pipeline/prompts/rank-movies.md).
 
 AWS setup is in [`infra/README.md`](infra/README.md).
 
@@ -104,6 +118,8 @@ pnpm dev
 TMDB_KEY=
 MDBLIST_KEY=
 ANTHROPIC_API_KEY=
+# Optional, for pnpm sync:lists
+TMDB_LIST_TOKEN=
 ```
 
 ```bash

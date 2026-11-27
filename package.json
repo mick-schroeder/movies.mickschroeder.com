@@ -26,6 +26,7 @@
     "build": "astro build",
     "preview": "astro preview",
     "build:data": "node --env-file-if-exists=.env pipeline/build.ts",
+    "sync:lists": "node --env-file-if-exists=.env pipeline/sync-lists.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
