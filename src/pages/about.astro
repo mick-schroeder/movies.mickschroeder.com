@@ -2,6 +2,14 @@
 // How the lists are made, and where to get them as JSON
 import { CopyUrl } from "@/components/copy-url"
 import MovieJoyplot from "@/components/movie-joyplot.astro"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import { LIST_SIZE, SITE } from "@/consts"
 import Layout from "@/layouts/base.astro"
 import { getMovies, getYears } from "@/lib/movies"
@@ -162,19 +170,35 @@ const top = (await getMovies()).find((movie) => movie.current === 1)
         The same lists on MDBList and TMDB, updated every night, to follow there
         or add to apps that read them.
       </p>
-      <ul class="flex flex-col gap-1">
-        {followLists.map(({ name, mdblist, tmdb }) => (
-          <li class="flex gap-4">
-            <span class="w-16 font-semibold">{name}</span>
-            <a href={`https://mdblist.com/lists/${mdblist}`} class={link}>
-              MDBList
-            </a>
-            <a href={`https://www.themoviedb.org/list/${tmdb}`} class={link}>
-              TMDB
-            </a>
-          </li>
-        ))}
-      </ul>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>List</TableHead>
+            <TableHead>MDBList</TableHead>
+            <TableHead>TMDB</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {followLists.map(({ name, mdblist, tmdb }) => (
+            <TableRow>
+              <TableCell className="font-semibold">{name}</TableCell>
+              <TableCell>
+                <a href={`https://mdblist.com/lists/${mdblist}`} class={link}>
+                  Follow on MDBList
+                </a>
+              </TableCell>
+              <TableCell>
+                <a
+                  href={`https://www.themoviedb.org/list/${tmdb}`}
+                  class={link}
+                >
+                  Follow on TMDB
+                </a>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </section>
   </div>
 </Layout>

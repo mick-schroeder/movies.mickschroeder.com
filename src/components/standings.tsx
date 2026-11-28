@@ -11,6 +11,8 @@ import {
   ArrowDownWideNarrow,
   ArrowUpWideNarrow,
   ChartArea,
+  CheckIcon,
+  ChevronDownIcon,
   LayoutGrid,
 } from "lucide-react"
 import {
@@ -21,10 +23,17 @@ import {
   useState,
   useSyncExternalStore,
 } from "react"
-import { Badge } from "@/components/ui/badge"
-import { Empty, EmptyDescription } from "@/components/ui/empty"
+import { type Poster, Posters } from "@/components/posters"
 import { Button } from "@/components/ui/button"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Empty, EmptyDescription } from "@/components/ui/empty"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Toggle } from "@/components/ui/toggle"
 import {
   Select,
   SelectContent,
@@ -277,64 +286,9 @@ export interface ListedMovie {
   href: string
 }
 
-interface Poster {
-  id: string
-  title: string
-  poster_url: string | null
-  href: string
-  /** In the corner: what it's sorted by, or nothing. */
-  badge: string | null
-  genres: string
-}
-
-function Posters({ movies }: { movies: Poster[] }) {
-  return (
-    <ol
-      className="grid grid-cols-2 gap-x-4 gap-y-10 px-4 pt-10 sm:grid-cols-3 sm:px-6 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
-      aria-label="Movies, in the chosen order"
-    >
-      {movies.map((movie, i) => (
-        <li key={movie.id}>
-          <a
-            href={movie.href}
-            className="group flex flex-col gap-3 rounded-sm focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-          >
-            <div className="relative aspect-2/3 overflow-hidden rounded-sm bg-muted">
-              {movie.badge && (
-                <Badge className="absolute top-2 left-2 font-bold tabular-nums">
-                  {movie.badge}
-                </Badge>
-              )}
-              {movie.poster_url && (
-                <img
-                  src={movie.poster_url}
-                  alt=""
-                  width="500"
-                  height="750"
-                  loading={i < 6 ? "eager" : "lazy"}
-                  decoding="async"
-                  className="size-full object-cover"
-                />
-              )}
-            </div>
-            <div>
-              <div className="leading-snug font-medium group-hover:text-primary">
-                {movie.title}
-              </div>
-              <div className="text-sm text-muted-foreground">
-                {movie.genres}
-              </div>
-            </div>
-          </a>
-        </li>
-      ))}
-    </ol>
-  )
-}
-
 // Two ways to see the same list, on the same page; the visitor's pick is remembered
 const VIEWS = [
-  { value: "chart", label: "Chart", Icon: ChartArea },
+  { value: "chart", label: "Plot", Icon: ChartArea },
   { value: "posters", label: "Posters", Icon: LayoutGrid },
 ] as const
 type ViewName = (typeof VIEWS)[number]["value"]
@@ -444,10 +398,18 @@ export function Standings({
     return pick(shown, e.clientX - box.left, e.clientY - box.top)
   }
   const ranked = order === "rank"
-  const backdrop =
-    hover &&
-    (data?.data.movies[hover]?.backdrop_url ??
-      data?.data.movies[hover]?.poster_url)
+  // Behind the page: the highlighted movie, else the page's #1. Each one
+  // seen stays mounted, so the browser keeps it and a swap can cross-fade,
+  // once the new one has loaded.
+  const behind = data?.data.movies[hover ?? String(listed[0]?.id)]
+  const backdrop = behind?.backdrop_url ?? behind?.poster_url
+  const [backdrops, setBackdrops] = useState<string[]>([])
+  const [ready, setReady] = useState<string[]>([])
+  const [onScreen, setOnScreen] = useState<string>()
+  if (backdrop && !backdrops.includes(backdrop))
+    setBackdrops([...backdrops, backdrop])
+  if (backdrop && ready.includes(backdrop) && onScreen !== backdrop)
+    setOnScreen(backdrop)
 
   // Before the history loads (and on the server), posters are the page's list.
   // Kept between highlights, which re-render this.
@@ -470,7 +432,7 @@ export function Standings({
   }, [data, order, reversed, listed])
 
   const items: { value: Choice; label: string }[] = [
-    { value: CURRENT, label: "Past 12 months" },
+    { value: CURRENT, label: "Current" },
     ...years.map((y) => ({ value: `${y}` as const, label: String(y) })),
   ]
   const orders = Object.entries(ORDERS).map(([value, { label }]) => ({
@@ -478,153 +440,179 @@ export function Standings({
     label,
   }))
 
+  const noRankings = (
+    <Empty className="py-32">
+      <EmptyDescription>
+        No rankings for {choice === CURRENT ? "the past 12 months" : choice}{" "}
+        yet.
+      </EmptyDescription>
+    </Empty>
+  )
+
   return (
     <>
-      {/* What to show, then how to order it, under the title */}
-      <div className="relative z-10 mt-6 flex flex-wrap gap-2 px-4 sm:px-6">
-        <Select
-          items={items}
-          value={choice}
-          onValueChange={(value) =>
-            value && value !== choice && navigate(choicePath(value))
-          }
-        >
-          <SelectTrigger aria-label="Time period">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {items.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
+      {backdrops.map((url) => (
+        <img
+          key={url}
+          src={url}
+          alt=""
+          className={cn("backdrop", url !== onScreen && "out")}
+          decoding="async"
+          onLoad={() => setReady((r) => [...r, url])}
+        />
+      ))}
+      {/* How to see it, what to show, then how to order it, under the title */}
+      <Tabs
+        value={view}
+        onValueChange={(next: ViewName) => chooseView(next)}
+        className="gap-0"
+      >
+        <div className="relative z-10 mt-6 flex flex-wrap gap-2 px-4 sm:px-6">
+          <TabsList>
+            {VIEWS.map(({ value, label, Icon }) => (
+              <TabsTrigger key={value} value={value}>
+                <Icon aria-hidden="true" />
+                {label}
+              </TabsTrigger>
             ))}
-          </SelectContent>
-        </Select>
-        <Select
-          items={orders}
-          value={order}
-          onValueChange={(value) => value && setOrder(value)}
-        >
-          <SelectTrigger aria-label="Sort">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {orders.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Button
-          variant="outline"
-          size="icon"
-          aria-label="Reverse order"
-          aria-pressed={reversed}
-          onClick={() => setReversed(!reversed)}
-        >
-          {reversed ? (
-            <ArrowUpWideNarrow aria-hidden="true" />
-          ) : (
-            <ArrowDownWideNarrow aria-hidden="true" />
-          )}
-        </Button>
-        <ToggleGroup
-          aria-label="View"
-          variant="outline"
-          spacing={0}
-          className="ml-auto"
-          value={[view]}
-          onValueChange={([next]) => {
-            if (next) chooseView(next as ViewName)
-          }}
-        >
-          {VIEWS.map(({ value, label, Icon }) => (
-            <ToggleGroupItem key={value} value={value} aria-label={label}>
-              <Icon aria-hidden="true" />
-              <span className="max-sm:sr-only">{label}</span>
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-      </div>
-      {loaded === "empty" ? (
-        <Empty className="py-32">
-          <EmptyDescription>
-            No rankings for {choice === CURRENT ? "the past 12 months" : choice}{" "}
-            yet.
-          </EmptyDescription>
-        </Empty>
-      ) : view === "posters" ? (
-        <Posters movies={posters} />
-      ) : loaded === "failed" ? (
-        <Empty className="py-32">
-          <EmptyDescription>
-            Couldn’t load the chart. Try Posters, or reload the page.
-          </EmptyDescription>
-        </Empty>
-      ) : (
-        <div
-          ref={wrapRef}
-          className="relative"
-          onPointerLeave={() => setHover(null)}
-        >
-          {/* The highlighted movie's poster behind the page */}
-          {backdrop && (
-            <img src={backdrop} alt="" className="backdrop" decoding="async" />
-          )}
-          <div
-            ref={chartRef}
-            className={cn(
-              "standings-chart",
-              !shown && "min-h-[60svh]",
-              hover && "cursor-pointer"
-            )}
-            onPointerMove={(e) => {
-              if (e.pointerType === "mouse") setHover(pointAt(e)?.id ?? null)
-            }}
-            onClick={(e) => {
-              const movie = pointAt(e)
-              if (movie) navigate(moviePath(movie))
-            }}
-          />
-          {shown && (
-            <ol
-              aria-label={
-                data?.current
-                  ? "The best movies of the past 12 months"
-                  : `The best movies of ${data?.data.year}`
-              }
-              className="absolute"
-              style={{
-                top: shown.top - shown.row / 2,
-                left: shown.gutter,
-                width: shown.column,
-                fontSize: shown.font,
-              }}
+          </TabsList>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={<Button variant="outline" aria-label="Time period" />}
             >
-              {shown.movies.map((movie) => (
-                <li key={movie.id} style={{ height: shown.row }}>
-                  <a
-                    href={moviePath(movie)}
-                    className={cn(
-                      "standings-title",
-                      hover === movie.id && "on"
-                    )}
-                    onPointerMove={(e) => {
-                      if (e.pointerType === "mouse") setHover(movie.id)
-                    }}
-                    onFocus={() => setHover(movie.id)}
-                    onBlur={() => setHover(null)}
-                  >
-                    {ranked && <span className="rank">{movie.rank}</span>}
-                    <span className="title">{movie.title}</span>
-                  </a>
-                </li>
+              {items.find((item) => item.value === choice)?.label}
+              <ChevronDownIcon data-icon="inline-end" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              {items.map((item) => (
+                <DropdownMenuItem
+                  key={item.value}
+                  render={
+                    <a
+                      href={choicePath(item.value)}
+                      aria-current={item.value === choice ? "page" : undefined}
+                    />
+                  }
+                >
+                  {item.label}
+                  {item.value === choice && (
+                    <CheckIcon aria-hidden="true" className="ml-auto" />
+                  )}
+                </DropdownMenuItem>
               ))}
-            </ol>
-          )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Select
+            items={orders}
+            value={order}
+            onValueChange={(value) => value && setOrder(value)}
+          >
+            <SelectTrigger aria-label="Sort">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {orders.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Toggle
+            variant="outline"
+            aria-label="Reverse order"
+            pressed={reversed}
+            onPressedChange={setReversed}
+          >
+            {reversed ? (
+              <ArrowUpWideNarrow aria-hidden="true" />
+            ) : (
+              <ArrowDownWideNarrow aria-hidden="true" />
+            )}
+          </Toggle>
         </div>
-      )}
+        <TabsContent value="chart" className="text-base">
+          {loaded === "empty" ? (
+            noRankings
+          ) : loaded === "failed" ? (
+            <Empty className="py-32">
+              <EmptyDescription>
+                Couldn’t load the plot. Try Posters, or reload the page.
+              </EmptyDescription>
+            </Empty>
+          ) : (
+            <div
+              ref={wrapRef}
+              className="relative"
+              onPointerLeave={() => setHover(null)}
+            >
+              <div
+                ref={chartRef}
+                className={cn(
+                  "standings-chart",
+                  !shown && "min-h-[60svh]",
+                  hover && "cursor-pointer"
+                )}
+                onPointerMove={(e) => {
+                  if (e.pointerType === "mouse")
+                    setHover(pointAt(e)?.id ?? null)
+                }}
+                onClick={(e) => {
+                  const movie = pointAt(e)
+                  if (movie) navigate(moviePath(movie))
+                }}
+              />
+              {shown && (
+                <ol
+                  aria-label={
+                    data?.current
+                      ? "The best movies of the past 12 months"
+                      : `The best movies of ${data?.data.year}`
+                  }
+                  className="absolute"
+                  style={{
+                    top: shown.top - shown.row / 2,
+                    left: shown.gutter,
+                    width: shown.column,
+                    fontSize: shown.font,
+                  }}
+                >
+                  {shown.movies.map((movie) => (
+                    <li key={movie.id} style={{ height: shown.row }}>
+                      <a
+                        href={moviePath(movie)}
+                        className={cn(
+                          "standings-title",
+                          hover === movie.id && "on"
+                        )}
+                        onPointerMove={(e) => {
+                          if (e.pointerType === "mouse") setHover(movie.id)
+                        }}
+                        onFocus={() => setHover(movie.id)}
+                        onBlur={() => setHover(null)}
+                      >
+                        {ranked && <span className="rank">{movie.rank}</span>}
+                        <span className="title">{movie.title}</span>
+                      </a>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+          )}
+        </TabsContent>
+        <TabsContent value="posters" className="text-base">
+          {loaded === "empty" ? (
+            noRankings
+          ) : (
+            <Posters
+              movies={posters}
+              label="Movies, in the chosen order"
+              className="grid-cols-2 px-4 pt-10 sm:grid-cols-3 sm:px-6 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
+            />
+          )}
+        </TabsContent>
+      </Tabs>
     </>
   )
 }

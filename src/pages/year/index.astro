@@ -1,8 +1,10 @@
 ---
 // Every year's page, newest first, each with its top movies
+import { Posters } from "@/components/posters"
 import { SITE } from "@/consts"
 import Layout from "@/layouts/base.astro"
 import { getYearList, getYears } from "@/lib/movies"
+import { genreLabel } from "@/lib/utils"
 import { ArrowRight } from "lucide-react"
 
 const TOP = 6
@@ -54,30 +56,16 @@ const jsonLd = [
             />
           </a>
         </h2>
-        <ol class="mt-5 grid grid-cols-3 gap-4 sm:grid-cols-6">
-          {movies.map((movie, i) => (
-            <li class={i >= 3 ? "max-sm:hidden" : undefined}>
-              <a href={movie.href} class="group flex flex-col gap-2">
-                <div class="aspect-2/3 overflow-hidden rounded-sm bg-muted">
-                  {movie.poster_url && (
-                    <img
-                      src={movie.poster_url.replace("/w500/", "/w342/")}
-                      alt=""
-                      width="342"
-                      height="513"
-                      loading="lazy"
-                      decoding="async"
-                      class="size-full object-cover"
-                    />
-                  )}
-                </div>
-                <span class="text-sm leading-snug font-medium group-hover:text-primary">
-                  {movie.title}
-                </span>
-              </a>
-            </li>
-          ))}
-        </ol>
+        <Posters
+          movies={movies.map((movie) => ({
+            ...movie,
+            id: String(movie.id),
+            badge: null,
+            genres: genreLabel(movie.genres, 2),
+          }))}
+          label={`The best movies of ${year}`}
+          className="mt-5 grid-cols-3 sm:grid-cols-6"
+        />
       </section>
     ))}
   </div>
